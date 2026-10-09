@@ -67,9 +67,9 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = 'Firebase Error: \n';
+        _errorMessage = _getFriendlyErrorMessage(e.code);
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _errorMessage = 'An unexpected error occurred during login. Please try again.';
       });
