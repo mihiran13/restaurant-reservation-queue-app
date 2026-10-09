@@ -30,8 +30,9 @@ class OwnerNavigation extends StatelessWidget {
             children: [
               _buildNavItem(0, Icons.dashboard_rounded, 'Dashboard'),
               _buildNavItem(1, Icons.insights_rounded, 'Analytics'),
-              _buildNavItem(2, Icons.description_outlined, 'Reports'),
-              _buildNavItem(3, Icons.settings_outlined, 'Settings'),
+              _buildNavItem(2, Icons.badge_outlined, 'Staffing'),
+              _buildNavItem(3, Icons.description_outlined, 'Reports'),
+              _buildNavItem(4, Icons.settings_outlined, 'Settings'),
             ],
           ),
         ),

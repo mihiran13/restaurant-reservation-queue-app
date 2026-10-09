@@ -14,6 +14,7 @@ import 'waiting_time.dart';
 import 'no_show.dart';
 import 'operational_reports.dart';
 import 'settings_screen.dart';
+import 'staff_allocation_screen.dart';
 
 /// Owner Dashboard / Home Screen faithful to Assignment 2 prototype
 class OwnerDashboardScreen extends StatefulWidget {
@@ -73,12 +74,19 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       return;
     } else if (index == 2) {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const OperationalReportsScreen()),
+        MaterialPageRoute(builder: (_) => const StaffAllocationScreen()),
       ).then((_) {
         if (mounted) setState(() => _currentNavIndex = 0);
       });
       return;
     } else if (index == 3) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const OperationalReportsScreen()),
+      ).then((_) {
+        if (mounted) setState(() => _currentNavIndex = 0);
+      });
+      return;
+    } else if (index == 4) {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const SettingsScreen()),
       ).then((_) {
@@ -197,6 +205,23 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 onTap: () {
                   Navigator.of(ctx).pop();
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NoShowScreen()));
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.people_alt_rounded, color: AppTheme.primary, size: 20),
+                ),
+                title: const Text('Staff Allocation & Scheduling', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Demand-based staff shift allocation'),
+                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StaffAllocationScreen()));
                 },
               ),
             ],
@@ -552,6 +577,19 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const NoShowScreen()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildQuickAccessTile(
+                    title: 'Staff Allocation & Shift Scheduling',
+                    subtitle: 'Demand-based shift allocation, peak staffing & rules',
+                    icon: Icons.badge_outlined,
+                    color: AppTheme.primary,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const StaffAllocationScreen()),
                       );
                     },
                   ),
