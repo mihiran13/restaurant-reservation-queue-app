@@ -57,7 +57,6 @@ class DefaultFirebaseOptions {
     projectId: 'yositham',
     storageBucket: 'yositham.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBm3Tn7hp3F55GWAegoyMkgbXevzigvtyo',
     appId: '1:979989856312:ios:f87779f0da6cb5a77b66cd',
@@ -66,7 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'yositham.firebasestorage.app',
     iosBundleId: 'com.restaurant.owner.restaurantApp',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyBm3Tn7hp3F55GWAegoyMkgbXevzigvtyo',
     appId: '1:979989856312:ios:f87779f0da6cb5a77b66cd',
