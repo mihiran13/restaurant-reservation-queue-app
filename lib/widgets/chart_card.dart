@@ -7,12 +7,69 @@ class ChartDataPoint {
   final String label;
   final double value;
   final String? displayValue;
+  final String? sortKey;
 
   const ChartDataPoint({
     required this.label,
     required this.value,
     this.displayValue,
+    this.sortKey,
   });
+}
+
+List<ChartDataPoint> normalizeChartData(List<ChartDataPoint> data) {
+  final points = data
+      .where((point) =>
+          point.label.trim().isNotEmpty &&
+          point.value.isFinite &&
+          point.value >= 0)
+      .toList();
+  int? timeMinutes(String label) {
+    final match =
+        RegExp(r'^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$', caseSensitive: false)
+            .firstMatch(label.trim());
+    if (match == null) return null;
+    var hour = int.parse(match.group(1)!);
+    final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+    final meridiem = match.group(3)?.toUpperCase();
+    if (meridiem == 'AM' && hour == 12) hour = 0;
+    if (meridiem == 'PM' && hour < 12) hour += 12;
+    if (hour > 23 || minute > 59) return null;
+    return hour * 60 + minute;
+  }
+
+  const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  int? categoryOrder(String label) {
+    final normalized = label.trim().toLowerCase();
+    final weekday = weekdays.indexWhere(normalized.startsWith);
+    if (weekday >= 0) return weekday;
+    final week = RegExp(r'^w(\d+)$').firstMatch(normalized);
+    if (week != null) return int.parse(week.group(1)!);
+    return null;
+  }
+
+  points.sort((a, b) {
+    final aKey = a.sortKey ?? a.label;
+    final bKey = b.sortKey ?? b.label;
+    final aDate = DateTime.tryParse(aKey);
+    final bDate = DateTime.tryParse(bKey);
+    if (aDate != null && bDate != null) {
+      final dateComparison = aDate.compareTo(bDate);
+      if (dateComparison != 0) return dateComparison;
+    }
+    if (aDate != null && bDate == null) return -1;
+    if (aDate == null && bDate != null) return 1;
+    final aTime = timeMinutes(a.label);
+    final bTime = timeMinutes(b.label);
+    if (aTime != null && bTime != null) return aTime.compareTo(bTime);
+    final aCategory = categoryOrder(a.label);
+    final bCategory = categoryOrder(b.label);
+    if (aCategory != null && bCategory != null) {
+      return aCategory.compareTo(bCategory);
+    }
+    return aKey.compareTo(bKey);
+  });
+  return points;
 }
 
 /// Chart style mode
@@ -42,7 +99,8 @@ class ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) {
+    final chartData = normalizeChartData(data);
+    if (chartData.isEmpty) {
       return Container(
         height: height,
         padding: const EdgeInsets.all(16),
@@ -60,7 +118,7 @@ class ChartCard extends StatelessWidget {
       );
     }
 
-    final maxValue = data.map((e) => e.value).reduce(math.max);
+    final maxValue = chartData.map((e) => e.value).reduce(math.max);
     final normalizedMax = maxValue == 0 ? 1.0 : maxValue;
 
     return Container(
@@ -71,7 +129,7 @@ class ChartCard extends StatelessWidget {
         border: Border.all(color: AppTheme.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: AppTheme.surfaceElevated,
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -111,7 +169,8 @@ class ChartCard extends StatelessWidget {
               ),
               if (unit != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: primaryColor.withValues(alpha: 0.09),
                     borderRadius: BorderRadius.circular(8),
@@ -131,20 +190,21 @@ class ChartCard extends StatelessWidget {
           SizedBox(
             height: height,
             child: chartType == ChartType.bar
-                ? _buildBarChart(normalizedMax)
-                : _buildLineChart(normalizedMax),
+                ? _buildBarChart(chartData, normalizedMax)
+                : _buildLineChart(chartData, normalizedMax),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBarChart(double maxVal) {
+  Widget _buildBarChart(List<ChartDataPoint> points, double maxVal) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: data.map((dp) {
-        final heightRatio = (dp.value / maxVal).clamp(0.05, 1.0);
+      children: points.map((dp) {
+        final heightRatio =
+            dp.value == 0 ? 0.0 : (dp.value / maxVal).clamp(0.05, 1.0);
 
         return Expanded(
           child: Padding(
@@ -207,11 +267,11 @@ class ChartCard extends StatelessWidget {
     );
   }
 
-  Widget _buildLineChart(double maxVal) {
+  Widget _buildLineChart(List<ChartDataPoint> points, double maxVal) {
     return CustomPaint(
       size: Size.infinite,
       painter: _SparklinePainter(
-        data: data,
+        data: points,
         maxVal: maxVal,
         lineColor: primaryColor,
       ),
@@ -221,7 +281,7 @@ class ChartCard extends StatelessWidget {
           const SizedBox.shrink(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: data.map((dp) {
+            children: points.map((dp) {
               return Expanded(
                 child: Text(
                   dp.label,
@@ -286,7 +346,7 @@ class _SparklinePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final dotInnerPaint = Paint()
-      ..color = Colors.white
+      ..color = AppTheme.textPrimary
       ..style = PaintingStyle.fill;
 
     final path = Path();

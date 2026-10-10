@@ -279,7 +279,7 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
                               width: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.4,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textPrimary),
                               ),
                             )
                           : const Row(

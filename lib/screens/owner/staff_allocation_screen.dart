@@ -4,6 +4,10 @@ import '../../data/staff_data.dart';
 import '../../services/staff_allocation_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/kpi_card.dart';
+import '../../widgets/owner_navigation.dart';
+import 'operational_reports.dart';
+import 'settings_screen.dart';
+import 'staff_management_screen.dart';
 
 /// Complete Staff Allocation & Scheduling Management System
 /// Includes:
@@ -31,7 +35,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
 
   // Selected date and time for recommendation inspection
   DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 19, minute: 0); // 7:00 PM default peak
+  TimeOfDay _selectedTime =
+      const TimeOfDay(hour: 19, minute: 0); // 7:00 PM default peak
 
   // Search & Filters for Staff
   String _staffSearchQuery = '';
@@ -64,7 +69,12 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   ];
 
   final List<String> _shiftTypes = ['Normal', 'Peak', 'Low Demand'];
-  final List<String> _allocationStatuses = ['Scheduled', 'Active', 'Completed', 'Cancelled'];
+  final List<String> _allocationStatuses = [
+    'Scheduled',
+    'Active',
+    'Completed',
+    'Cancelled'
+  ];
   final List<String> _demandLevels = ['Low', 'Normal', 'High', 'Very High'];
   final List<String> _daysOfWeek = [
     'Everyday',
@@ -81,7 +91,7 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
-    _selectedAllocDateFilter = _formatDate(_selectedDate);
+    _selectedAllocDateFilter = '';
   }
 
   @override
@@ -107,6 +117,24 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     return tod.format(context);
   }
 
+  void _navigateMainSection(int index) {
+    if (index == 2) return;
+    if (index == 0) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else if (index == 2) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) =>
+              StaffManagementScreen(restaurantId: widget.restaurantId)));
+    } else if (index == 3) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) =>
+              OperationalReportsScreen(restaurantId: widget.restaurantId)));
+    } else if (index == 4) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => SettingsScreen(restaurantId: widget.restaurantId)));
+    }
+  }
+
   Color _getDemandColor(String level) {
     switch (level) {
       case 'Low':
@@ -130,51 +158,20 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
         children: [
           AppHeader(
             title: 'Staff Allocation',
-            subtitle: 'Demand-Based Staff Scheduling',
+            subtitle: 'Assign staff to a date and time period',
             showBackButton: true,
-            trailing: IconButton(
-              icon: const Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary),
-              tooltip: 'About Staff Allocation',
-              onPressed: _showInfoDialog,
-            ),
-          ),
-          Container(
-            color: AppTheme.surface,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              labelColor: AppTheme.primary,
-              unselectedLabelColor: AppTheme.textSecondary,
-              indicatorColor: AppTheme.primary,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
-              tabs: const [
-                Tab(icon: Icon(Icons.dashboard_rounded, size: 18), text: 'Dashboard'),
-                Tab(icon: Icon(Icons.people_alt_rounded, size: 18), text: 'Staff'),
-                Tab(icon: Icon(Icons.calendar_month_rounded, size: 18), text: 'Allocations'),
-                Tab(icon: Icon(Icons.alarm_on_rounded, size: 18), text: 'Peak Hours'),
-                Tab(icon: Icon(Icons.rule_rounded, size: 18), text: 'Rules'),
-              ],
-            ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildDashboardTab(),
-                _buildStaffTab(),
-                _buildAllocationsTab(),
-                _buildPeakHoursTab(),
-                _buildRulesTab(),
-              ],
-            ),
+            child: _buildAllocationsTab(),
           ),
         ],
       ),
+      bottomNavigationBar: OwnerNavigation(
+          currentIndex: 2, onItemSelected: _navigateMainSection),
     );
   }
 
+  // ignore: unused_element
   void _showInfoDialog() {
     showDialog(
       context: context,
@@ -184,7 +181,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           children: [
             Icon(Icons.auto_graph_rounded, color: AppTheme.primary),
             SizedBox(width: 8),
-            Text('Smart Staff Allocation', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text('Smart Staff Allocation',
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ],
         ),
         content: const Column(
@@ -200,7 +198,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
               '• Peak Hours → More staff allocated\n'
               '• Normal Hours → Standard staff allocation\n'
               '• Low-Demand Hours → Optimized staff allocation',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary),
             ),
             SizedBox(height: 10),
             Text(
@@ -223,6 +224,7 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   // TAB 1: DASHBOARD
   // ===========================================================================
 
+  // ignore: unused_element
   Widget _buildDashboardTab() {
     final dateStr = _formatDate(_selectedDate);
     final timeStr = _formatTime(_selectedTime);
@@ -230,38 +232,85 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     return StreamBuilder<List<StaffMember>>(
       stream: _service.streamStaffMembers(widget.restaurantId),
       builder: (context, staffSnap) {
-        final allStaff = staffSnap.data ?? StaffAllocationService.defaultStaffMembers(widget.restaurantId);
+        if (staffSnap.hasError) {
+          return Center(
+              child: Text('Unable to load staff: ${staffSnap.error}'));
+        }
+        if (!staffSnap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final allStaff = staffSnap.data!;
         final activeStaff = allStaff.where((s) => s.isActive).toList();
 
         return StreamBuilder<List<StaffAllocation>>(
-          stream: _service.streamAllocations(widget.restaurantId, date: dateStr),
+          stream:
+              _service.streamAllocations(widget.restaurantId, date: dateStr),
           builder: (context, allocSnap) {
-            final allocations = allocSnap.data ?? StaffAllocationService.defaultAllocations(widget.restaurantId, dateStr);
+            if (allocSnap.hasError) {
+              return Center(
+                  child:
+                      Text('Unable to load allocations: ${allocSnap.error}'));
+            }
+            if (!allocSnap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final allocations = allocSnap.data!;
 
             return StreamBuilder<List<PeakHourConfig>>(
               stream: _service.streamPeakHours(widget.restaurantId),
               builder: (context, peakSnap) {
-                final peakConfigs = peakSnap.data ?? StaffAllocationService.defaultPeakHours(widget.restaurantId);
+                if (peakSnap.hasError) {
+                  return Center(
+                      child: Text(
+                          'Unable to load peak-hour settings: ${peakSnap.error}'));
+                }
+                if (!peakSnap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final peakConfigs = peakSnap.data!;
 
                 return StreamBuilder<List<StaffAllocationRule>>(
                   stream: _service.streamRules(widget.restaurantId),
                   builder: (context, ruleSnap) {
-                    final rules = ruleSnap.data ?? StaffAllocationService.defaultRules(widget.restaurantId);
+                    if (ruleSnap.hasError) {
+                      return Center(
+                          child: Text(
+                              'Unable to load allocation rules: ${ruleSnap.error}'));
+                    }
+                    if (!ruleSnap.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final rules = ruleSnap.data!;
+                    if (rules.isEmpty) {
+                      return const Center(
+                          child: Text('No allocation rules are configured.'));
+                    }
 
                     return FutureBuilder<Map<String, int>>(
-                      future: StaffAllocationService.fetchReservationQueueDemand(
+                      future:
+                          StaffAllocationService.fetchReservationQueueDemand(
                         firestore: _service.firestore,
                         restaurantId: widget.restaurantId,
                         date: dateStr,
                         time: timeStr,
                       ),
                       builder: (context, demandSnap) {
-                        final demandData = demandSnap.data ?? {'reservations': 22, 'queue': 5};
-                        final resCount = demandData['reservations'] ?? 22;
-                        final queueCount = demandData['queue'] ?? 5;
+                        if (demandSnap.hasError) {
+                          return Center(
+                              child: Text(
+                                  'Unable to load reservation/queue demand: ${demandSnap.error}'));
+                        }
+                        if (!demandSnap.hasData) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        final demandData = demandSnap.data!;
+                        final resCount = demandData['reservations'] ?? 0;
+                        final queueCount = demandData['queue'] ?? 0;
 
                         // Calculate Smart Recommendation
-                        final recommendation = StaffAllocationService.calculateRecommendation(
+                        final recommendation =
+                            StaffAllocationService.calculateRecommendation(
                           date: _selectedDate,
                           time: timeStr,
                           reservations: resCount,
@@ -277,12 +326,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                             .map((a) => a.staffId)
                             .toSet();
                         final totalAllocatedToday = allocatedStaffIds.length;
-                        final availableToday = activeStaff.length - totalAllocatedToday;
+                        final availableToday =
+                            activeStaff.length - totalAllocatedToday;
 
                         // Peak hours today
-                        final dayName = StaffAllocationService.getDayOfWeekName(_selectedDate);
+                        final dayName = StaffAllocationService.getDayOfWeekName(
+                            _selectedDate);
                         final todayPeaks = peakConfigs
-                            .where((p) => p.dayOfWeek == dayName || p.dayOfWeek == 'Everyday')
+                            .where((p) =>
+                                p.dayOfWeek == dayName ||
+                                p.dayOfWeek == 'Everyday')
                             .toList();
 
                         return RefreshIndicator(
@@ -298,13 +351,17 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                               const SizedBox(height: 14),
 
                               // Alert Banner (Shortage vs Satisfied)
-                              _buildShortageBanner(recommendation, allStaff, allocations),
+                              _buildShortageBanner(
+                                  recommendation, allStaff, allocations),
                               const SizedBox(height: 16),
 
                               // 2x3 KPI Summary Grid
                               const Text(
                                 "Today's Staff Allocation Overview",
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary),
                               ),
                               const SizedBox(height: 10),
                               GridView.count(
@@ -318,9 +375,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                   KpiCard(
                                     title: 'Total Active Staff',
                                     value: '${activeStaff.length}',
-                                    subtitle: 'Out of ${allStaff.length} registered',
+                                    subtitle:
+                                        'Out of ${allStaff.length} registered',
                                     icon: Icons.badge_outlined,
-                                    iconColor: const Color(0xFF2563EB),
+                                    iconColor: AppTheme.accentBlue,
                                   ),
                                   KpiCard(
                                     title: 'Allocated Today',
@@ -331,7 +389,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                   ),
                                   KpiCard(
                                     title: 'Available Staff',
-                                    value: '${availableToday >= 0 ? availableToday : 0}',
+                                    value:
+                                        '${availableToday >= 0 ? availableToday : 0}',
                                     subtitle: 'Unscheduled active staff',
                                     icon: Icons.person_add_alt_1_outlined,
                                     iconColor: AppTheme.success,
@@ -339,36 +398,46 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                   KpiCard(
                                     title: 'Current Demand',
                                     value: recommendation.demandLevel,
-                                    subtitle: '${recommendation.totalExpectedCustomers} exp. guests',
+                                    subtitle:
+                                        '${recommendation.totalExpectedCustomers} exp. guests',
                                     icon: Icons.trending_up_rounded,
-                                    iconColor: _getDemandColor(recommendation.demandLevel),
+                                    iconColor: _getDemandColor(
+                                        recommendation.demandLevel),
                                   ),
                                   KpiCard(
                                     title: 'Recommended Staff',
                                     value: '${recommendation.recommendedStaff}',
                                     subtitle: 'For $timeStr slot',
                                     icon: Icons.support_agent_rounded,
-                                    iconColor: const Color(0xFF8B5CF6),
+                                    iconColor: AppTheme.primary,
                                   ),
                                   KpiCard(
                                     title: 'Staff Shortage',
                                     value: recommendation.hasShortage
                                         ? '-${recommendation.shortage}'
                                         : '0 (OK)',
-                                    subtitle: recommendation.hasShortage ? 'Requires action' : 'Staffing satisfied',
-                                    icon: recommendation.hasShortage ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                                    iconColor: recommendation.hasShortage ? AppTheme.error : AppTheme.success,
+                                    subtitle: recommendation.hasShortage
+                                        ? 'Requires action'
+                                        : 'Staffing satisfied',
+                                    icon: recommendation.hasShortage
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.check_circle_outline,
+                                    iconColor: recommendation.hasShortage
+                                        ? AppTheme.error
+                                        : AppTheme.success,
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 20),
 
                               // Detailed Demand & Recommendation Analysis Card
-                              _buildRecommendationDetailCard(recommendation, todayPeaks, allStaff, allocations),
+                              _buildRecommendationDetailCard(recommendation,
+                                  todayPeaks, allStaff, allocations),
                               const SizedBox(height: 20),
 
                               // Hourly Staff Allocation Timeline
-                              _buildHourlyTimelineCard(rules, peakConfigs, allocations),
+                              _buildHourlyTimelineCard(
+                                  rules, peakConfigs, allocations),
                               const SizedBox(height: 24),
                             ],
                           ),
@@ -401,11 +470,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             children: [
               const Row(
                 children: [
-                  Icon(Icons.schedule_rounded, color: AppTheme.primary, size: 20),
+                  Icon(Icons.schedule_rounded,
+                      color: AppTheme.primary, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'Time Period Evaluation',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppTheme.textPrimary),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: AppTheme.textPrimary),
                   ),
                 ],
               ),
@@ -417,7 +490,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 ),
                 child: Text(
                   StaffAllocationService.getDayOfWeekName(_selectedDate),
-                  style: const TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -431,7 +507,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: _selectedDate,
-                      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                      firstDate:
+                          DateTime.now().subtract(const Duration(days: 30)),
                       lastDate: DateTime.now().add(const Duration(days: 90)),
                     );
                     if (picked != null) {
@@ -443,19 +520,24 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       border: Border.all(color: AppTheme.cardBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.textSecondary),
+                        const Icon(Icons.calendar_today_rounded,
+                            size: 16, color: AppTheme.textSecondary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             dateStr,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary),
                           ),
                         ),
                       ],
@@ -479,19 +561,24 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       border: Border.all(color: AppTheme.cardBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.access_time_rounded, size: 16, color: AppTheme.textSecondary),
+                        const Icon(Icons.access_time_rounded,
+                            size: 16, color: AppTheme.textSecondary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _selectedTime.format(context),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary),
                           ),
                         ),
                       ],
@@ -515,9 +602,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
       return Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFFEF2F2),
+          color: AppTheme.cancelledBackground,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFFCA5A5)),
+          border: Border.all(color: AppTheme.error.withValues(alpha: 0.45)),
         ),
         child: Row(
           children: [
@@ -527,7 +614,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 color: Color(0xFFEF4444),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+              child: const Icon(Icons.warning_amber_rounded,
+                  color: AppTheme.textPrimary, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -536,12 +624,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 children: [
                   const Text(
                     '⚠️ Staff Shortage Detected',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF991B1B)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppTheme.error),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${rec.shortage} additional staff member${rec.shortage > 1 ? 's are' : ' is'} recommended for this ${rec.isPeakHour ? 'peak ' : ''}period.',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textSecondary),
                   ),
                 ],
               ),
@@ -549,11 +641,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.error,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () => _showQuickAllocateModal(rec, allStaff, allocations),
-              child: const Text('Allocate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              onPressed: () =>
+                  _showQuickAllocateModal(rec, allStaff, allocations),
+              child: const Text('Allocate',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -563,9 +659,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
+        color: AppTheme.readyBackground,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF86EFAC)),
+        border: Border.all(color: AppTheme.success.withValues(alpha: 0.45)),
       ),
       child: const Row(
         children: [
@@ -577,12 +673,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
               children: [
                 Text(
                   '✓ Staffing Requirement Satisfied',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF166534)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: AppTheme.success),
                 ),
                 SizedBox(height: 2),
                 Text(
                   'Sufficient staff members are scheduled for the current expected restaurant demand.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF14532D)),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                 ),
               ],
             ),
@@ -613,12 +712,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             children: [
               const Text(
                 'Demand & Staff Recommendation',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getDemandColor(rec.demandLevel).withValues(alpha: 0.12),
+                  color:
+                      _getDemandColor(rec.demandLevel).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -635,11 +738,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           const SizedBox(height: 14),
           Row(
             children: [
-              _buildDemandPill('Reservations', '${rec.expectedReservations}', Icons.bookmark_added_outlined),
+              _buildDemandPill('Reservations', '${rec.expectedReservations}',
+                  Icons.bookmark_added_outlined),
               const SizedBox(width: 8),
-              _buildDemandPill('Queue', '${rec.currentQueue}', Icons.people_outline_rounded),
+              _buildDemandPill(
+                  'Queue', '${rec.currentQueue}', Icons.people_outline_rounded),
               const SizedBox(width: 8),
-              _buildDemandPill('Total Guests', '${rec.totalExpectedCustomers}', Icons.restaurant_rounded),
+              _buildDemandPill('Total Guests', '${rec.totalExpectedCustomers}',
+                  Icons.restaurant_rounded),
             ],
           ),
           const SizedBox(height: 14),
@@ -648,13 +754,17 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatMetric('Recommended', '${rec.recommendedStaff}', AppTheme.primary),
+              _buildStatMetric(
+                  'Recommended', '${rec.recommendedStaff}', AppTheme.primary),
               Container(width: 1, height: 32, color: AppTheme.cardBorder),
-              _buildStatMetric('Currently Allocated', '${rec.allocatedStaff}', const Color(0xFF2563EB)),
+              _buildStatMetric('Currently Allocated', '${rec.allocatedStaff}',
+                  AppTheme.accentBlue),
               Container(width: 1, height: 32, color: AppTheme.cardBorder),
               _buildStatMetric(
                 rec.hasShortage ? 'Shortage' : 'Surplus',
-                rec.hasShortage ? '${rec.shortage}' : '${(rec.allocatedStaff - rec.recommendedStaff).abs()}',
+                rec.hasShortage
+                    ? '${rec.shortage}'
+                    : '${(rec.allocatedStaff - rec.recommendedStaff).abs()}',
                 rec.hasShortage ? AppTheme.error : AppTheme.success,
               ),
             ],
@@ -670,12 +780,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.bolt_rounded, color: Color(0xFFD97706), size: 18),
+                  const Icon(Icons.bolt_rounded,
+                      color: AppTheme.warning, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Configured Peak Period active (${_formatTimeDisplay(rec.matchedPeakConfig!.startTime)} - ${_formatTimeDisplay(rec.matchedPeakConfig!.endTime)}). Min staff requirement: ${rec.matchedPeakConfig!.minStaff}.',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -688,7 +802,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             child: ElevatedButton.icon(
               icon: const Icon(Icons.person_add_rounded, size: 18),
               label: const Text('Allocate Staff For This Period'),
-              onPressed: () => _showQuickAllocateModal(rec, allStaff, allocations),
+              onPressed: () =>
+                  _showQuickAllocateModal(rec, allStaff, allocations),
             ),
           ),
         ],
@@ -714,14 +829,20 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 const SizedBox(width: 4),
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary),
             ),
           ],
         ),
@@ -734,7 +855,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
       children: [
         Text(
           val,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color),
+          style: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w800, color: color),
         ),
         const SizedBox(height: 2),
         Text(
@@ -768,9 +890,13 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             children: [
               Text(
                 'Hourly Staff Allocation Schedule',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary),
               ),
-              Icon(Icons.view_timeline_outlined, color: AppTheme.primary, size: 20),
+              Icon(Icons.view_timeline_outlined,
+                  color: AppTheme.primary, size: 20),
             ],
           ),
           const SizedBox(height: 4),
@@ -783,7 +909,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: hours.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.cardBorder),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: AppTheme.cardBorder),
             itemBuilder: (context, idx) {
               final h = hours[idx];
               final timeString = '${h.toString().padLeft(2, '0')}:00';
@@ -822,9 +949,12 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                   decoration: BoxDecoration(
-                    color: isSelectedHour ? AppTheme.primary.withValues(alpha: 0.08) : Colors.transparent,
+                    color: isSelectedHour
+                        ? AppTheme.primary.withValues(alpha: 0.08)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -835,22 +965,30 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                           timeOfDay.format(context),
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isSelectedHour ? FontWeight.w700 : FontWeight.w600,
-                            color: isSelectedHour ? AppTheme.primary : AppTheme.textPrimary,
+                            fontWeight: isSelectedHour
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                            color: isSelectedHour
+                                ? AppTheme.primary
+                                : AppTheme.textPrimary,
                           ),
                         ),
                       ),
                       if (rec.isPeakHour)
                         Container(
                           margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppTheme.warning.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
                             'PEAK',
-                            style: TextStyle(color: Color(0xFFD97706), fontSize: 9, fontWeight: FontWeight.w800),
+                            style: TextStyle(
+                                color: AppTheme.warning,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800),
                           ),
                         ),
                       Expanded(
@@ -859,16 +997,24 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                           children: [
                             Text(
                               '${rec.allocatedStaff} Allocated',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary),
                             ),
-                            const Text(' / ', style: TextStyle(color: AppTheme.textMuted)),
+                            const Text(' / ',
+                                style: TextStyle(color: AppTheme.textMuted)),
                             Text(
                               '${rec.recommendedStaff} Rec.',
-                              style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.primary,
+                                  fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(width: 10),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: rec.hasShortage
                                     ? AppTheme.error.withValues(alpha: 0.12)
@@ -876,11 +1022,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                rec.hasShortage ? '-${rec.shortage} Short' : 'OK',
+                                rec.hasShortage
+                                    ? '-${rec.shortage} Short'
+                                    : 'OK',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
-                                  color: rec.hasShortage ? AppTheme.error : AppTheme.success,
+                                  color: rec.hasShortage
+                                      ? AppTheme.error
+                                      : AppTheme.success,
                                 ),
                               ),
                             ),
@@ -902,24 +1052,32 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   // TAB 2: STAFF MANAGEMENT CRUD
   // ===========================================================================
 
+  // ignore: unused_element
   Widget _buildStaffTab() {
     return StreamBuilder<List<StaffMember>>(
       stream: _service.streamStaffMembers(widget.restaurantId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary));
         }
 
         final staffList = snapshot.data ?? [];
 
         // Apply filters & search
         final filtered = staffList.where((s) {
-          final matchesSearch = s.name.toLowerCase().contains(_staffSearchQuery.toLowerCase()) ||
+          final matchesSearch = s.name
+                  .toLowerCase()
+                  .contains(_staffSearchQuery.toLowerCase()) ||
               s.role.toLowerCase().contains(_staffSearchQuery.toLowerCase()) ||
-              s.department.toLowerCase().contains(_staffSearchQuery.toLowerCase());
+              s.department
+                  .toLowerCase()
+                  .contains(_staffSearchQuery.toLowerCase());
 
-          final matchesRole = _selectedStaffRoleFilter == 'All' || s.role == _selectedStaffRoleFilter;
-          final matchesStatus = _selectedStaffStatusFilter == 'All' || s.status == _selectedStaffStatusFilter;
+          final matchesRole = _selectedStaffRoleFilter == 'All' ||
+              s.role == _selectedStaffRoleFilter;
+          final matchesStatus = _selectedStaffStatusFilter == 'All' ||
+              s.status == _selectedStaffStatusFilter;
 
           return matchesSearch && matchesRole && matchesStatus;
         }).toList();
@@ -928,8 +1086,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           backgroundColor: Colors.transparent,
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppTheme.primary,
-            icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
-            label: const Text('Add Staff', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            icon: const Icon(Icons.person_add_alt_1_rounded,
+                color: AppTheme.textPrimary),
+            label: const Text('Add Staff',
+                style: TextStyle(
+                    color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
             onPressed: () => _showStaffDialog(),
           ),
           body: Column(
@@ -947,12 +1108,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         suffixIcon: _staffSearchQuery.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () => setState(() => _staffSearchQuery = ''),
+                                onPressed: () =>
+                                    setState(() => _staffSearchQuery = ''),
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
                       ),
-                      onChanged: (val) => setState(() => _staffSearchQuery = val),
+                      onChanged: (val) =>
+                          setState(() => _staffSearchQuery = val),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -962,12 +1126,17 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                             value: _selectedStaffRoleFilter,
                             decoration: const InputDecoration(
                               labelText: 'Filter Role',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                             ),
                             items: ['All', ..._roles]
-                                .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12))))
+                                .map((r) => DropdownMenuItem(
+                                    value: r,
+                                    child: Text(r,
+                                        style: const TextStyle(fontSize: 12))))
                                 .toList(),
-                            onChanged: (val) => setState(() => _selectedStaffRoleFilter = val ?? 'All'),
+                            onChanged: (val) => setState(
+                                () => _selectedStaffRoleFilter = val ?? 'All'),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -976,12 +1145,17 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                             value: _selectedStaffStatusFilter,
                             decoration: const InputDecoration(
                               labelText: 'Filter Status',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                             ),
                             items: ['All', 'Active', 'Inactive']
-                                .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
+                                .map((s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s,
+                                        style: const TextStyle(fontSize: 12))))
                                 .toList(),
-                            onChanged: (val) => setState(() => _selectedStaffStatusFilter = val ?? 'All'),
+                            onChanged: (val) => setState(() =>
+                                _selectedStaffStatusFilter = val ?? 'All'),
                           ),
                         ),
                       ],
@@ -996,7 +1170,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     ? _buildEmptyState(
                         icon: Icons.people_outline_rounded,
                         title: 'No Staff Members Found',
-                        message: 'Try adjusting your search query or add a new staff member.',
+                        message:
+                            'Try adjusting your search query or add a new staff member.',
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
@@ -1037,7 +1212,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   staff.name.isNotEmpty ? staff.name[0].toUpperCase() : '?',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: staff.isActive ? AppTheme.primary : AppTheme.textSecondary,
+                    color: staff.isActive
+                        ? AppTheme.primary
+                        : AppTheme.textSecondary,
                   ),
                 ),
               ),
@@ -1048,12 +1225,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   children: [
                     Text(
                       staff.name,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppTheme.textPrimary),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${staff.role} • ${staff.department}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: const TextStyle(
+                          fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -1065,13 +1246,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   await _service.toggleStaffStatus(staff.id, newStatus);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${staff.name} is now $newStatus')),
+                      SnackBar(
+                          content: Text('${staff.name} is now $newStatus')),
                     );
                   }
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: staff.isActive
                         ? AppTheme.success.withValues(alpha: 0.12)
@@ -1086,7 +1269,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         height: 7,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: staff.isActive ? AppTheme.success : AppTheme.textMuted,
+                          color: staff.isActive
+                              ? AppTheme.success
+                              : AppTheme.textMuted,
                         ),
                       ),
                       const SizedBox(width: 5),
@@ -1095,7 +1280,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: staff.isActive ? AppTheme.success : AppTheme.textSecondary,
+                          color: staff.isActive
+                              ? AppTheme.success
+                              : AppTheme.textSecondary,
                         ),
                       ),
                     ],
@@ -1112,24 +1299,32 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             children: [
               Row(
                 children: [
-                  const Icon(Icons.phone_outlined, size: 13, color: AppTheme.textMuted),
+                  const Icon(Icons.phone_outlined,
+                      size: 13, color: AppTheme.textMuted),
                   const SizedBox(width: 4),
-                  Text(staff.phone, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                  Text(staff.phone,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppTheme.textSecondary)),
                   const SizedBox(width: 12),
-                  const Icon(Icons.timer_outlined, size: 13, color: AppTheme.textMuted),
+                  const Icon(Icons.timer_outlined,
+                      size: 13, color: AppTheme.textMuted),
                   const SizedBox(width: 4),
-                  Text('${staff.maxDailyHours}h max/day', style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                  Text('${staff.maxDailyHours}h max/day',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppTheme.textSecondary)),
                 ],
               ),
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.textSecondary),
+                    icon: const Icon(Icons.edit_outlined,
+                        size: 18, color: AppTheme.textSecondary),
                     onPressed: () => _showStaffDialog(staff: staff),
                     tooltip: 'Edit Staff Member',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppTheme.error),
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        size: 18, color: AppTheme.error),
                     onPressed: () => _confirmDeleteStaff(staff),
                     tooltip: 'Delete Staff Member',
                   ),
@@ -1146,8 +1341,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     final nameCtrl = TextEditingController(text: staff?.name ?? '');
     final phoneCtrl = TextEditingController(text: staff?.phone ?? '');
     final emailCtrl = TextEditingController(text: staff?.email ?? '');
-    final maxHoursCtrl = TextEditingController(text: '${staff?.maxDailyHours ?? 8}');
-    final fromCtrl = TextEditingController(text: staff?.availableFrom ?? '08:00');
+    final maxHoursCtrl =
+        TextEditingController(text: '${staff?.maxDailyHours ?? 8}');
+    final fromCtrl =
+        TextEditingController(text: staff?.availableFrom ?? '08:00');
     final toCtrl = TextEditingController(text: staff?.availableTo ?? '17:00');
     String role = staff?.role ?? _roles.first;
     String department = staff?.department ?? _departments.first;
@@ -1159,13 +1356,19 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(staff == null ? Icons.person_add_rounded : Icons.edit_note_rounded, color: AppTheme.primary),
+                Icon(
+                    staff == null
+                        ? Icons.person_add_rounded
+                        : Icons.edit_note_rounded,
+                    color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Text(staff == null ? 'Add Staff Member' : 'Edit Staff Member',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 17)),
               ],
             ),
             content: SingleChildScrollView(
@@ -1176,8 +1379,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   children: [
                     TextFormField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Full Name *'),
-                      validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter staff name' : null,
+                      decoration:
+                          const InputDecoration(labelText: 'Full Name *'),
+                      validator: (val) => (val == null || val.trim().isEmpty)
+                          ? 'Please enter staff name'
+                          : null,
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -1185,8 +1391,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: role,
-                            decoration: const InputDecoration(labelText: 'Role *'),
-                            items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
+                            decoration:
+                                const InputDecoration(labelText: 'Role *'),
+                            items: _roles
+                                .map((r) => DropdownMenuItem(
+                                    value: r,
+                                    child: Text(r,
+                                        style: const TextStyle(fontSize: 13))))
+                                .toList(),
                             onChanged: (val) {
                               if (val != null) setDialogState(() => role = val);
                             },
@@ -1196,10 +1408,18 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: department,
-                            decoration: const InputDecoration(labelText: 'Department *'),
-                            items: _departments.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 13)))).toList(),
+                            decoration: const InputDecoration(
+                                labelText: 'Department *'),
+                            items: _departments
+                                .map((d) => DropdownMenuItem(
+                                    value: d,
+                                    child: Text(d,
+                                        style: const TextStyle(fontSize: 13))))
+                                .toList(),
                             onChanged: (val) {
-                              if (val != null) setDialogState(() => department = val);
+                              if (val != null) {
+                                setDialogState(() => department = val);
+                              }
                             },
                           ),
                         ),
@@ -1208,16 +1428,24 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: phoneCtrl,
-                      decoration: const InputDecoration(labelText: 'Phone Number *'),
+                      decoration:
+                          const InputDecoration(labelText: 'Phone Number *'),
                       keyboardType: TextInputType.phone,
-                      validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter phone' : null,
+                      validator: (val) => (val == null || val.trim().isEmpty)
+                          ? 'Please enter phone'
+                          : null,
                     ),
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: emailCtrl,
-                      decoration: const InputDecoration(labelText: 'Email Address *'),
+                      decoration:
+                          const InputDecoration(labelText: 'Email Address *'),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (val) => (val == null || val.trim().isEmpty || !val.contains('@')) ? 'Valid email required' : null,
+                      validator: (val) => (val == null ||
+                              val.trim().isEmpty ||
+                              !val.contains('@'))
+                          ? 'Valid email required'
+                          : null,
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -1225,11 +1453,19 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: fromCtrl,
-                            decoration: const InputDecoration(labelText: 'Available From *'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                            decoration: const InputDecoration(
+                                labelText: 'Available From *'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: false),
                             validator: (val) {
-                              if (val == null || val.trim().isEmpty) return 'Enter start time';
-                              if (StaffAllocationService.timeToMinutes(val.trim()) < 0) return 'Invalid start time';
+                              if (val == null || val.trim().isEmpty) {
+                                return 'Enter start time';
+                              }
+                              if (StaffAllocationService.timeToMinutes(
+                                      val.trim()) <
+                                  0) {
+                                return 'Invalid start time';
+                              }
                               return null;
                             },
                           ),
@@ -1238,13 +1474,23 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: toCtrl,
-                            decoration: const InputDecoration(labelText: 'Available To *'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                            decoration: const InputDecoration(
+                                labelText: 'Available To *'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: false),
                             validator: (val) {
-                              if (val == null || val.trim().isEmpty) return 'Enter end time';
-                              final fromMinutes = StaffAllocationService.timeToMinutes(fromCtrl.text.trim());
-                              final toMinutes = StaffAllocationService.timeToMinutes(val.trim());
-                              if (toMinutes <= fromMinutes) return 'Available end time must be later';
+                              if (val == null || val.trim().isEmpty) {
+                                return 'Enter end time';
+                              }
+                              final fromMinutes =
+                                  StaffAllocationService.timeToMinutes(
+                                      fromCtrl.text.trim());
+                              final toMinutes =
+                                  StaffAllocationService.timeToMinutes(
+                                      val.trim());
+                              if (toMinutes <= fromMinutes) {
+                                return 'Available end time must be later';
+                              }
                               return null;
                             },
                           ),
@@ -1254,11 +1500,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: maxHoursCtrl,
-                      decoration: const InputDecoration(labelText: 'Maximum Working Hours *'),
+                      decoration: const InputDecoration(
+                          labelText: 'Maximum Working Hours *'),
                       keyboardType: TextInputType.number,
                       validator: (val) {
                         final num = int.tryParse(val ?? '');
-                        if (num == null || num <= 0 || num > 24) return '1-24 hours';
+                        if (num == null || num <= 0 || num > 24) {
+                          return '1-24 hours';
+                        }
                         return null;
                       },
                     ),
@@ -1266,7 +1515,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     DropdownButtonFormField<String>(
                       value: status,
                       decoration: const InputDecoration(labelText: 'Status'),
-                      items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                      items: ['Active', 'Inactive']
+                          .map(
+                              (s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setDialogState(() => status = val);
                       },
@@ -1278,7 +1530,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                child: const Text('Cancel',
+                    style: TextStyle(color: AppTheme.textSecondary)),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -1296,7 +1549,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         role: role,
                         department: department,
                         status: status,
-                        availableHours: '${fromCtrl.text.trim()} - ${toCtrl.text.trim()}',
+                        availableHours:
+                            '${fromCtrl.text.trim()} - ${toCtrl.text.trim()}',
                         availableFrom: fromCtrl.text.trim(),
                         availableTo: toCtrl.text.trim(),
                         maxDailyHours: maxH,
@@ -1310,7 +1564,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         role: role,
                         department: department,
                         status: status,
-                        availableHours: '${fromCtrl.text.trim()} - ${toCtrl.text.trim()}',
+                        availableHours:
+                            '${fromCtrl.text.trim()} - ${toCtrl.text.trim()}',
                         availableFrom: fromCtrl.text.trim(),
                         availableTo: toCtrl.text.trim(),
                         maxDailyHours: maxH,
@@ -1319,7 +1574,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     }
                     nav.pop();
                     messenger.showSnackBar(
-                      SnackBar(content: Text(staff == null ? 'Staff member added successfully' : 'Staff member updated')),
+                      SnackBar(
+                          content: Text(staff == null
+                              ? 'Staff member added successfully'
+                              : 'Staff member updated')),
                     );
                   }
                 },
@@ -1336,10 +1594,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Staff Member', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to delete ${staff.name}? This will remove them from all scheduling lists.'),
+        title: const Text('Delete Staff Member',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(
+            'Are you sure you want to delete ${staff.name}? This will remove them from all scheduling lists.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -1367,21 +1629,39 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     return StreamBuilder<List<StaffMember>>(
       stream: _service.streamStaffMembers(widget.restaurantId),
       builder: (context, staffSnap) {
+        if (staffSnap.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary));
+        }
+        if (staffSnap.hasError) {
+          return Center(
+              child: Text(
+                  'Could not load staff from Firestore: ${staffSnap.error}'));
+        }
         final allStaff = staffSnap.data ?? [];
 
         return StreamBuilder<List<StaffAllocation>>(
-          stream: _service.streamAllocations(widget.restaurantId, date: _selectedAllocDateFilter),
+          stream: _service.streamAllocations(widget.restaurantId,
+              date: _selectedAllocDateFilter),
           builder: (context, allocSnap) {
             if (allocSnap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+              return const Center(
+                  child: CircularProgressIndicator(color: AppTheme.primary));
+            }
+            if (allocSnap.hasError) {
+              return Center(
+                  child: Text(
+                      'Could not load allocations from Firestore: ${allocSnap.error}'));
             }
 
             final allocations = allocSnap.data ?? [];
 
             // Filter allocations
             final filtered = allocations.where((a) {
-              final matchesRole = _selectedAllocRoleFilter == 'All' || a.staffRole == _selectedAllocRoleFilter;
-              final matchesStatus = _selectedAllocStatusFilter == 'All' || a.status == _selectedAllocStatusFilter;
+              final matchesRole = _selectedAllocRoleFilter == 'All' ||
+                  a.staffRole == _selectedAllocRoleFilter;
+              final matchesStatus = _selectedAllocStatusFilter == 'All' ||
+                  a.status == _selectedAllocStatusFilter;
               return matchesRole && matchesStatus;
             }).toList();
 
@@ -1389,9 +1669,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
               backgroundColor: Colors.transparent,
               floatingActionButton: FloatingActionButton.extended(
                 backgroundColor: AppTheme.primary,
-                icon: const Icon(Icons.add_task_rounded, color: Colors.white),
-                label: const Text('New Allocation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                onPressed: () => _showAllocationDialog(allStaff: allStaff, existingAllocations: allocations),
+                icon: const Icon(Icons.add_task_rounded,
+                    color: AppTheme.textPrimary),
+                label: const Text('New Allocation',
+                    style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.w700)),
+                onPressed: () => _showAllocationDialog(
+                    allStaff: allStaff, existingAllocations: allocations),
               ),
               body: Column(
                 children: [
@@ -1408,30 +1693,41 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 onTap: () async {
                                   final picked = await showDatePicker(
                                     context: context,
-                                    initialDate: DateTime.tryParse(_selectedAllocDateFilter) ?? DateTime.now(),
-                                    firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                    lastDate: DateTime.now().add(const Duration(days: 90)),
+                                    initialDate: DateTime.tryParse(
+                                            _selectedAllocDateFilter) ??
+                                        DateTime.now(),
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 30)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 90)),
                                   );
                                   if (picked != null) {
                                     setState(() {
-                                      _selectedAllocDateFilter = _formatDate(picked);
+                                      _selectedAllocDateFilter =
+                                          _formatDate(picked);
                                     });
                                   }
                                 },
                                 borderRadius: BorderRadius.circular(12),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: AppTheme.cardBorder),
+                                    border:
+                                        Border.all(color: AppTheme.cardBorder),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.event_note_rounded, size: 16, color: AppTheme.primary),
+                                      const Icon(Icons.event_note_rounded,
+                                          size: 16, color: AppTheme.primary),
                                       const SizedBox(width: 8),
                                       Text(
-                                        'Date: $_selectedAllocDateFilter',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                                        'Date: ${_selectedAllocDateFilter.isEmpty ? 'All dates' : _selectedAllocDateFilter}',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.textPrimary),
                                       ),
                                     ],
                                   ),
@@ -1442,14 +1738,20 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                             OutlinedButton(
                               onPressed: () {
                                 setState(() {
-                                  _selectedAllocDateFilter = _formatDate(DateTime.now());
+                                  _selectedAllocDateFilter =
+                                      _formatDate(DateTime.now());
                                 });
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
-                              child: const Text('Today', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              child: const Text('Today',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
                             ),
                           ],
                         ),
@@ -1461,12 +1763,18 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 value: _selectedAllocRoleFilter,
                                 decoration: const InputDecoration(
                                   labelText: 'Role',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
                                 ),
                                 items: ['All', ..._roles]
-                                    .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12))))
+                                    .map((r) => DropdownMenuItem(
+                                        value: r,
+                                        child: Text(r,
+                                            style:
+                                                const TextStyle(fontSize: 12))))
                                     .toList(),
-                                onChanged: (val) => setState(() => _selectedAllocRoleFilter = val ?? 'All'),
+                                onChanged: (val) => setState(() =>
+                                    _selectedAllocRoleFilter = val ?? 'All'),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -1475,12 +1783,18 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 value: _selectedAllocStatusFilter,
                                 decoration: const InputDecoration(
                                   labelText: 'Shift Status',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
                                 ),
                                 items: ['All', ..._allocationStatuses]
-                                    .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
+                                    .map((s) => DropdownMenuItem(
+                                        value: s,
+                                        child: Text(s,
+                                            style:
+                                                const TextStyle(fontSize: 12))))
                                     .toList(),
-                                onChanged: (val) => setState(() => _selectedAllocStatusFilter = val ?? 'All'),
+                                onChanged: (val) => setState(() =>
+                                    _selectedAllocStatusFilter = val ?? 'All'),
                               ),
                             ),
                           ],
@@ -1495,14 +1809,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         ? _buildEmptyState(
                             icon: Icons.calendar_today_rounded,
                             title: 'No Shifts Scheduled',
-                            message: 'No allocations match this date and filter. Tap below to allocate staff.',
+                            message:
+                                'No allocations match this date and filter. Tap below to allocate staff.',
                           )
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
                             itemCount: filtered.length,
                             itemBuilder: (context, idx) {
                               final alloc = filtered[idx];
-                              return _buildAllocationCard(alloc, allStaff, allocations);
+                              return _buildAllocationCard(
+                                  alloc, allStaff, allocations);
                             },
                           ),
                   ),
@@ -1546,7 +1862,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                       color: shiftTypeColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.access_time_filled_rounded, color: shiftTypeColor, size: 18),
+                    child: Icon(Icons.access_time_filled_rounded,
+                        color: shiftTypeColor, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -1554,12 +1871,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     children: [
                       Text(
                         '${_formatTimeDisplay(alloc.startTime)} – ${_formatTimeDisplay(alloc.endTime)}',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: AppTheme.textPrimary),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${alloc.staffName} (${alloc.staffRole})',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ],
                   ),
@@ -1582,7 +1903,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     fontWeight: FontWeight.w700,
                     color: alloc.status == 'Active'
                         ? AppTheme.success
-                        : (alloc.status == 'Scheduled' ? AppTheme.info : AppTheme.textSecondary),
+                        : (alloc.status == 'Scheduled'
+                            ? AppTheme.info
+                            : AppTheme.textSecondary),
                   ),
                 ),
               ),
@@ -1591,11 +1914,13 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.place_outlined, size: 14, color: AppTheme.textMuted),
+              const Icon(Icons.place_outlined,
+                  size: 14, color: AppTheme.textMuted),
               const SizedBox(width: 4),
               Text(
                 'Area: ${alloc.assignedArea}',
-                style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                style: const TextStyle(
+                    fontSize: 11, color: AppTheme.textSecondary),
               ),
               const SizedBox(width: 12),
               Container(
@@ -1606,7 +1931,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 ),
                 child: Text(
                   '${alloc.shiftType} Shift',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: shiftTypeColor),
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: shiftTypeColor),
                 ),
               ),
             ],
@@ -1615,7 +1943,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             const SizedBox(height: 6),
             Text(
               'Note: ${alloc.notes}',
-              style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppTheme.textSecondary),
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: AppTheme.textSecondary),
             ),
           ],
           const SizedBox(height: 8),
@@ -1633,8 +1964,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 ),
               ),
               TextButton.icon(
-                icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.error),
-                label: const Text('Delete', style: TextStyle(fontSize: 12, color: AppTheme.error)),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    size: 16, color: AppTheme.error),
+                label: const Text('Delete',
+                    style: TextStyle(fontSize: 12, color: AppTheme.error)),
                 onPressed: () => _confirmDeleteAllocation(alloc),
               ),
             ],
@@ -1649,20 +1982,23 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     required List<StaffMember> allStaff,
     required List<StaffAllocation> existingAllocations,
   }) async {
-    String date = allocation?.date ?? _selectedAllocDateFilter;
+    String date = allocation?.date ??
+        (_selectedAllocDateFilter.isEmpty
+            ? _formatDate(DateTime.now())
+            : _selectedAllocDateFilter);
     TimeOfDay startTime = allocation != null
         ? TimeOfDay(
             hour: int.tryParse(allocation.startTime.split(':')[0]) ?? 10,
             minute: int.tryParse(allocation.startTime.split(':')[1]) ?? 0,
           )
-        : const TimeOfDay(hour: 18, minute: 0);
+        : const TimeOfDay(hour: 10, minute: 0);
 
     TimeOfDay endTime = allocation != null
         ? TimeOfDay(
             hour: int.tryParse(allocation.endTime.split(':')[0]) ?? 22,
             minute: int.tryParse(allocation.endTime.split(':')[1]) ?? 0,
           )
-        : const TimeOfDay(hour: 22, minute: 0);
+        : const TimeOfDay(hour: 14, minute: 0);
 
     String? selectedStaffId = allocation?.staffId;
     String assignedArea = allocation?.assignedArea ?? 'Dining Area';
@@ -1681,7 +2017,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           final eTimeStr = _formatTime(endTime);
 
           // Find available staff for this slot
-          final availableStaff = StaffAllocationService.getAvailableStaffForSlot(
+          final availableStaff =
+              StaffAllocationService.getAvailableStaffForSlot(
             date: date,
             startTime: sTimeStr,
             endTime: eTimeStr,
@@ -1691,22 +2028,30 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           );
 
           // If current selection is no longer available and we are adding new
-          if (selectedStaffId != null && !availableStaff.any((s) => s.id == selectedStaffId)) {
+          if (selectedStaffId != null &&
+              !availableStaff.any((s) => s.id == selectedStaffId)) {
             if (allocation == null) {
-              selectedStaffId = availableStaff.isNotEmpty ? availableStaff.first.id : null;
+              selectedStaffId =
+                  availableStaff.isNotEmpty ? availableStaff.first.id : null;
             }
           } else if (selectedStaffId == null && availableStaff.isNotEmpty) {
             selectedStaffId = availableStaff.first.id;
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(allocation == null ? Icons.add_task_rounded : Icons.edit_calendar_rounded, color: AppTheme.primary),
+                Icon(
+                    allocation == null
+                        ? Icons.add_task_rounded
+                        : Icons.edit_calendar_rounded,
+                    color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Text(allocation == null ? 'Schedule Shift' : 'Edit Shift',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 17)),
               ],
             ),
             content: SingleChildScrollView(
@@ -1721,18 +2066,23 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         padding: const EdgeInsets.all(8),
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
+                          color: AppTheme.cancelledBackground,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                          border: Border.all(
+                              color: AppTheme.error.withValues(alpha: 0.45)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline, color: AppTheme.error, size: 16),
+                            const Icon(Icons.error_outline,
+                                color: AppTheme.error, size: 16),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 validationError!,
-                                style: const TextStyle(color: Color(0xFF991B1B), fontSize: 11, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: AppTheme.error,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
                           ],
@@ -1740,15 +2090,20 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                       ),
 
                     // Date selector
-                    const Text('Shift Date *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    const Text('Shift Date *',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.tryParse(date) ?? DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                          lastDate: DateTime.now().add(const Duration(days: 90)),
+                          initialDate:
+                              DateTime.tryParse(date) ?? DateTime.now(),
+                          firstDate:
+                              DateTime.now().subtract(const Duration(days: 30)),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 90)),
                         );
                         if (picked != null) {
                           setDialogState(() {
@@ -1758,7 +2113,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
                           border: Border.all(color: AppTheme.cardBorder),
                           borderRadius: BorderRadius.circular(10),
@@ -1766,8 +2122,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(date, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            const Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondary),
+                            Text(date,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13)),
+                            const Icon(Icons.calendar_today,
+                                size: 16, color: AppTheme.textSecondary),
                           ],
                         ),
                       ),
@@ -1775,14 +2134,17 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     const SizedBox(height: 12),
 
                     // Shift Time Range
-                    const Text('Shift Duration *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    const Text('Shift Duration *',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         Expanded(
                           child: InkWell(
                             onTap: () async {
-                              final picked = await showTimePicker(context: context, initialTime: startTime);
+                              final picked = await showTimePicker(
+                                  context: context, initialTime: startTime);
                               if (picked != null) {
                                 setDialogState(() {
                                   startTime = picked;
@@ -1796,7 +2158,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 border: Border.all(color: AppTheme.cardBorder),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Text('Start: ${startTime.format(context)}', style: const TextStyle(fontSize: 12)),
+                              child: Text('Start: ${startTime.format(context)}',
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ),
                         ),
@@ -1804,7 +2167,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () async {
-                              final picked = await showTimePicker(context: context, initialTime: endTime);
+                              final picked = await showTimePicker(
+                                  context: context, initialTime: endTime);
                               if (picked != null) {
                                 setDialogState(() {
                                   endTime = picked;
@@ -1818,7 +2182,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 border: Border.all(color: AppTheme.cardBorder),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Text('End: ${endTime.format(context)}', style: const TextStyle(fontSize: 12)),
+                              child: Text('End: ${endTime.format(context)}',
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ),
                         ),
@@ -1830,9 +2195,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Staff Member *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        const Text('Staff Member *',
+                            style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600)),
                         Text('${availableStaff.length} available',
-                            style: const TextStyle(fontSize: 11, color: AppTheme.success, fontWeight: FontWeight.w700)),
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.success,
+                                fontWeight: FontWeight.w700)),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -1840,22 +2210,48 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         ? Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
+                              color: AppTheme.cancelledBackground,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                              border: Border.all(
+                                  color:
+                                      AppTheme.error.withValues(alpha: 0.45)),
                             ),
-                            child: const Text(
-                              'No active staff available for this time window. Staff members may already have overlapping shifts or be inactive.',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF991B1B)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  allStaff.isEmpty
+                                      ? 'No staff records found. Add a staff member in Staff Management first.'
+                                      : 'No active staff available for this time window. Check availability or overlapping shifts.',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: AppTheme.error),
+                                ),
+                                if (allStaff.isEmpty)
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.of(ctx).pop();
+                                      Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                              builder: (_) =>
+                                                  StaffManagementScreen(
+                                                      restaurantId: widget
+                                                          .restaurantId)));
+                                    },
+                                    child: const Text('Open Staff Management'),
+                                  ),
+                              ],
                             ),
                           )
                         : DropdownButtonFormField<String>(
                             value: selectedStaffId,
-                            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                            decoration: const InputDecoration(
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8)),
                             items: availableStaff.map((s) {
                               return DropdownMenuItem(
                                 value: s.id,
-                                child: Text('${s.name} (${s.role})', style: const TextStyle(fontSize: 13)),
+                                child: Text('${s.name} (${s.role})',
+                                    style: const TextStyle(fontSize: 13)),
                               );
                             }).toList(),
                             onChanged: (val) {
@@ -1864,7 +2260,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 validationError = null;
                               });
                             },
-                            validator: (val) => val == null ? 'Please select a staff member' : null,
+                            validator: (val) => val == null
+                                ? 'Please select a staff member'
+                                : null,
                           ),
                     const SizedBox(height: 12),
 
@@ -1874,19 +2272,31 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             initialValue: assignedArea,
-                            decoration: const InputDecoration(labelText: 'Assigned Area *'),
+                            decoration: const InputDecoration(
+                                labelText: 'Assigned Area *'),
                             onChanged: (val) => assignedArea = val,
-                            validator: (val) => val == null || val.trim().isEmpty ? 'Enter area' : null,
+                            validator: (val) =>
+                                val == null || val.trim().isEmpty
+                                    ? 'Enter area'
+                                    : null,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: shiftType,
-                            decoration: const InputDecoration(labelText: 'Shift Type'),
-                            items: _shiftTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 12)))).toList(),
+                            decoration:
+                                const InputDecoration(labelText: 'Shift Type'),
+                            items: _shiftTypes
+                                .map((t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text(t,
+                                        style: const TextStyle(fontSize: 12))))
+                                .toList(),
                             onChanged: (val) {
-                              if (val != null) setDialogState(() => shiftType = val);
+                              if (val != null) {
+                                setDialogState(() => shiftType = val);
+                              }
                             },
                           ),
                         ),
@@ -1897,7 +2307,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     DropdownButtonFormField<String>(
                       value: status,
                       decoration: const InputDecoration(labelText: 'Status'),
-                      items: _allocationStatuses.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                      items: _allocationStatuses
+                          .map(
+                              (s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setDialogState(() => status = val);
                       },
@@ -1906,7 +2319,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
 
                     TextFormField(
                       controller: notesCtrl,
-                      decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                      decoration:
+                          const InputDecoration(labelText: 'Notes (optional)'),
                     ),
                   ],
                 ),
@@ -1915,28 +2329,34 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                child: const Text('Cancel',
+                    style: TextStyle(color: AppTheme.textSecondary)),
               ),
               ElevatedButton(
                 onPressed: availableStaff.isEmpty && selectedStaffId == null
                     ? null
                     : () async {
                         // Validate end time > start time
-                        final sMins = StaffAllocationService.timeToMinutes(sTimeStr);
-                        final eMins = StaffAllocationService.timeToMinutes(eTimeStr);
+                        final sMins =
+                            StaffAllocationService.timeToMinutes(sTimeStr);
+                        final eMins =
+                            StaffAllocationService.timeToMinutes(eTimeStr);
                         if (eMins <= sMins) {
                           setDialogState(() {
-                            validationError = 'Shift end time must be after start time';
+                            validationError =
+                                'Shift end time must be after start time';
                           });
                           return;
                         }
 
                         // Check max daily hours of selected staff
-                        final staffObj = allStaff.firstWhere((s) => s.id == selectedStaffId);
+                        final staffObj =
+                            allStaff.firstWhere((s) => s.id == selectedStaffId);
                         final durationHours = (eMins - sMins) / 60.0;
                         if (durationHours > staffObj.maxDailyHours) {
                           setDialogState(() {
-                            validationError = '${staffObj.name} exceeds max daily hours limit of ${staffObj.maxDailyHours}h (this shift is ${durationHours.toStringAsFixed(1)}h).';
+                            validationError =
+                                '${staffObj.name} exceeds max daily hours limit of ${staffObj.maxDailyHours}h (this shift is ${durationHours.toStringAsFixed(1)}h).';
                           });
                           return;
                         }
@@ -1979,11 +2399,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
 
                             nav.pop();
                             messenger.showSnackBar(
-                              SnackBar(content: Text(allocation == null ? 'Shift scheduled successfully' : 'Shift updated')),
+                              SnackBar(
+                                  content: Text(allocation == null
+                                      ? 'Shift scheduled successfully'
+                                      : 'Shift updated')),
                             );
                           } catch (e) {
                             setDialogState(() {
-                              validationError = e.toString().replaceAll('Exception: ', '');
+                              validationError =
+                                  e.toString().replaceAll('Exception: ', '');
                             });
                           }
                         }
@@ -2001,10 +2425,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel / Delete Shift', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text('Remove shift for ${alloc.staffName} (${alloc.startTime} - ${alloc.endTime}) on ${alloc.date}?'),
+        title: const Text('Cancel / Delete Shift',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(
+            'Remove shift for ${alloc.staffName} (${alloc.startTime} - ${alloc.endTime}) on ${alloc.date}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -2068,7 +2496,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     children: [
                       const Text(
                         'Quick Staff Allocation',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close_rounded),
@@ -2078,26 +2509,31 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   ),
                   Text(
                     'Time: $startTimeStr – $endTimeStr • Recommended Staff: ${rec.recommendedStaff} • Needed: $shortageNeeded',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 14),
                   if (availableStaff.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
+                        color: AppTheme.cancelledBackground,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                        border: Border.all(
+                            color: AppTheme.error.withValues(alpha: 0.45)),
                       ),
                       child: const Text(
                         'No additional staff members are available for this period. All active staff are currently scheduled or unavailable.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+                        style: TextStyle(fontSize: 12, color: AppTheme.error),
                       ),
                     )
                   else ...[
                     const Text(
                       'Select available staff members to allocate:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary),
                     ),
                     const SizedBox(height: 8),
                     ConstrainedBox(
@@ -2112,12 +2548,19 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                           return CheckboxListTile(
                             value: isChecked,
                             activeColor: AppTheme.primary,
-                            title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            subtitle: Text('${s.role} • ${s.department}', style: const TextStyle(fontSize: 11)),
+                            title: Text(s.name,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13)),
+                            subtitle: Text('${s.role} • ${s.department}',
+                                style: const TextStyle(fontSize: 11)),
                             secondary: CircleAvatar(
                               radius: 16,
-                              backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                              child: Text(s.name[0], style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700)),
+                              backgroundColor:
+                                  AppTheme.primary.withValues(alpha: 0.1),
+                              child: Text(s.name[0],
+                                  style: const TextStyle(
+                                      color: AppTheme.primary,
+                                      fontWeight: FontWeight.w700)),
                             ),
                             onChanged: (val) {
                               setModalState(() {
@@ -2142,7 +2585,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 final messenger = ScaffoldMessenger.of(context);
                                 final nav = Navigator.of(ctx);
                                 for (final staffId in selectedStaffIds) {
-                                  final staffObj = availableStaff.firstWhere((s) => s.id == staffId);
+                                  final staffObj = availableStaff
+                                      .firstWhere((s) => s.id == staffId);
                                   final newAlloc = StaffAllocation(
                                     id: '',
                                     restaurantId: widget.restaurantId,
@@ -2153,9 +2597,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                     staffName: staffObj.name,
                                     staffRole: staffObj.role,
                                     assignedArea: staffObj.department,
-                                    shiftType: rec.isPeakHour ? 'Peak' : 'Normal',
+                                    shiftType:
+                                        rec.isPeakHour ? 'Peak' : 'Normal',
                                     status: 'Scheduled',
-                                    notes: 'Auto-allocated to fulfill ${rec.demandLevel} demand shortage',
+                                    notes:
+                                        'Auto-allocated to fulfill ${rec.demandLevel} demand shortage',
                                   );
                                   await _service.addAllocation(newAlloc);
                                 }
@@ -2171,7 +2617,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                   setState(() {});
                                 }
                               },
-                        child: Text('Confirm Allocation (${selectedStaffIds.length} Selected)'),
+                        child: Text(
+                            'Confirm Allocation (${selectedStaffIds.length} Selected)'),
                       ),
                     ),
                   ],
@@ -2188,12 +2635,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   // TAB 4: PEAK HOURS CONFIGURATION CRUD
   // ===========================================================================
 
+  // ignore: unused_element
   Widget _buildPeakHoursTab() {
     return StreamBuilder<List<PeakHourConfig>>(
       stream: _service.streamPeakHours(widget.restaurantId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary));
         }
 
         final configs = snapshot.data ?? [];
@@ -2202,8 +2651,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           backgroundColor: Colors.transparent,
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppTheme.primary,
-            icon: const Icon(Icons.add_alarm_rounded, color: Colors.white),
-            label: const Text('Add Peak Window', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            icon: const Icon(Icons.add_alarm_rounded,
+                color: AppTheme.textPrimary),
+            label: const Text('Add Peak Window',
+                style: TextStyle(
+                    color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
             onPressed: () => _showPeakHourDialog(),
           ),
           body: ListView(
@@ -2218,12 +2670,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 20),
+                    Icon(Icons.info_outline_rounded,
+                        color: AppTheme.primary, size: 20),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Configure scheduled peak periods by day of week. The recommendation engine applies these minimums when scheduling shifts.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ),
                   ],
@@ -2234,7 +2688,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 _buildEmptyState(
                   icon: Icons.alarm_off_rounded,
                   title: 'No Peak Hours Configured',
-                  message: 'Tap below to define peak hours for your restaurant.',
+                  message:
+                      'Tap below to define peak hours for your restaurant.',
                 )
               else
                 ...configs.map((c) => _buildPeakHourCard(c)),
@@ -2265,10 +2720,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      color: AppTheme.waitingBackground,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B), size: 18),
+                    child: const Icon(Icons.bolt_rounded,
+                        color: AppTheme.warning, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -2276,12 +2732,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     children: [
                       Text(
                         config.dayOfWeek,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: AppTheme.textPrimary),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${_formatTimeDisplay(config.startTime)} – ${_formatTimeDisplay(config.endTime)}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ],
                   ),
@@ -2290,7 +2750,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getDemandColor(config.demandLevel).withValues(alpha: 0.12),
+                  color: _getDemandColor(config.demandLevel)
+                      .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -2309,7 +2770,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             children: [
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                   decoration: BoxDecoration(
                     color: AppTheme.background,
                     borderRadius: BorderRadius.circular(8),
@@ -2317,14 +2779,18 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   child: Text(
                     'Min Staff: ${config.minStaff}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                   decoration: BoxDecoration(
                     color: AppTheme.background,
                     borderRadius: BorderRadius.circular(8),
@@ -2332,7 +2798,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   child: Text(
                     'Recommended: ${config.recommendedStaff}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary),
                   ),
                 ),
               ),
@@ -2344,12 +2813,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.textSecondary),
+                icon: const Icon(Icons.edit_outlined,
+                    size: 18, color: AppTheme.textSecondary),
                 onPressed: () => _showPeakHourDialog(config: config),
                 tooltip: 'Edit Peak Hour',
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppTheme.error),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    size: 18, color: AppTheme.error),
                 onPressed: () => _confirmDeletePeakHour(config),
                 tooltip: 'Delete Peak Hour',
               ),
@@ -2363,17 +2834,23 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   Future<void> _showPeakHourDialog({PeakHourConfig? config}) async {
     String day = config?.dayOfWeek ?? 'Monday';
     TimeOfDay startTime = config != null
-        ? TimeOfDay(hour: int.tryParse(config.startTime.split(':')[0]) ?? 18, minute: int.tryParse(config.startTime.split(':')[1]) ?? 0)
+        ? TimeOfDay(
+            hour: int.tryParse(config.startTime.split(':')[0]) ?? 18,
+            minute: int.tryParse(config.startTime.split(':')[1]) ?? 0)
         : const TimeOfDay(hour: 18, minute: 0);
 
     TimeOfDay endTime = config != null
-        ? TimeOfDay(hour: int.tryParse(config.endTime.split(':')[0]) ?? 21, minute: int.tryParse(config.endTime.split(':')[1]) ?? 0)
+        ? TimeOfDay(
+            hour: int.tryParse(config.endTime.split(':')[0]) ?? 21,
+            minute: int.tryParse(config.endTime.split(':')[1]) ?? 0)
         : const TimeOfDay(hour: 21, minute: 0);
 
     String demandLevel = config?.demandLevel ?? 'High';
     String status = config?.status ?? 'Enabled';
-    final minStaffCtrl = TextEditingController(text: '${config?.minStaff ?? 6}');
-    final recStaffCtrl = TextEditingController(text: '${config?.recommendedStaff ?? 8}');
+    final minStaffCtrl =
+        TextEditingController(text: '${config?.minStaff ?? 6}');
+    final recStaffCtrl =
+        TextEditingController(text: '${config?.recommendedStaff ?? 8}');
     final formKey = GlobalKey<FormState>();
 
     await showDialog(
@@ -2381,13 +2858,19 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(config == null ? Icons.add_alarm_rounded : Icons.edit_note_rounded, color: AppTheme.primary),
+                Icon(
+                    config == null
+                        ? Icons.add_alarm_rounded
+                        : Icons.edit_note_rounded,
+                    color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Text(config == null ? 'Add Peak Period' : 'Edit Peak Period',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 17)),
               ],
             ),
             content: SingleChildScrollView(
@@ -2398,8 +2881,12 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   children: [
                     DropdownButtonFormField<String>(
                       value: day,
-                      decoration: const InputDecoration(labelText: 'Day of the Week *'),
-                      items: _daysOfWeek.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      decoration:
+                          const InputDecoration(labelText: 'Day of the Week *'),
+                      items: _daysOfWeek
+                          .map(
+                              (d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setDialogState(() => day = val);
                       },
@@ -2410,8 +2897,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () async {
-                              final picked = await showTimePicker(context: context, initialTime: startTime);
-                              if (picked != null) setDialogState(() => startTime = picked);
+                              final picked = await showTimePicker(
+                                  context: context, initialTime: startTime);
+                              if (picked != null) {
+                                setDialogState(() => startTime = picked);
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.all(10),
@@ -2419,7 +2909,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 border: Border.all(color: AppTheme.cardBorder),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Text('Start: ${startTime.format(context)}', style: const TextStyle(fontSize: 12)),
+                              child: Text('Start: ${startTime.format(context)}',
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ),
                         ),
@@ -2427,8 +2918,11 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () async {
-                              final picked = await showTimePicker(context: context, initialTime: endTime);
-                              if (picked != null) setDialogState(() => endTime = picked);
+                              final picked = await showTimePicker(
+                                  context: context, initialTime: endTime);
+                              if (picked != null) {
+                                setDialogState(() => endTime = picked);
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.all(10),
@@ -2436,7 +2930,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                                 border: Border.all(color: AppTheme.cardBorder),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Text('End: ${endTime.format(context)}', style: const TextStyle(fontSize: 12)),
+                              child: Text('End: ${endTime.format(context)}',
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ),
                         ),
@@ -2445,10 +2940,16 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       value: demandLevel,
-                      decoration: const InputDecoration(labelText: 'Expected Demand Level *'),
-                      items: _demandLevels.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      decoration: const InputDecoration(
+                          labelText: 'Expected Demand Level *'),
+                      items: _demandLevels
+                          .map(
+                              (d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .toList(),
                       onChanged: (val) {
-                        if (val != null) setDialogState(() => demandLevel = val);
+                        if (val != null) {
+                          setDialogState(() => demandLevel = val);
+                        }
                       },
                     ),
                     const SizedBox(height: 10),
@@ -2456,8 +2957,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                       value: status,
                       decoration: const InputDecoration(labelText: 'Status *'),
                       items: const [
-                        DropdownMenuItem(value: 'Enabled', child: Text('Enabled')),
-                        DropdownMenuItem(value: 'Disabled', child: Text('Disabled')),
+                        DropdownMenuItem(
+                            value: 'Enabled', child: Text('Enabled')),
+                        DropdownMenuItem(
+                            value: 'Disabled', child: Text('Disabled')),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => status = val);
@@ -2469,7 +2972,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: minStaffCtrl,
-                            decoration: const InputDecoration(labelText: 'Min Staff *'),
+                            decoration:
+                                const InputDecoration(labelText: 'Min Staff *'),
                             keyboardType: TextInputType.number,
                             validator: (val) {
                               final n = int.tryParse(val ?? '');
@@ -2482,7 +2986,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: recStaffCtrl,
-                            decoration: const InputDecoration(labelText: 'Rec. Staff *'),
+                            decoration: const InputDecoration(
+                                labelText: 'Rec. Staff *'),
                             keyboardType: TextInputType.number,
                             validator: (val) {
                               final n = int.tryParse(val ?? '');
@@ -2500,15 +3005,18 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                child: const Text('Cancel',
+                    style: TextStyle(color: AppTheme.textSecondary)),
               ),
               ElevatedButton(
                 onPressed: () async {
                   final sTimeStr = _formatTime(startTime);
                   final eTimeStr = _formatTime(endTime);
-                  if (StaffAllocationService.timeToMinutes(eTimeStr) <= StaffAllocationService.timeToMinutes(sTimeStr)) {
+                  if (StaffAllocationService.timeToMinutes(eTimeStr) <=
+                      StaffAllocationService.timeToMinutes(sTimeStr)) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('End time must be after start time')),
+                      const SnackBar(
+                          content: Text('End time must be after start time')),
                     );
                     return;
                   }
@@ -2516,8 +3024,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   if (formKey.currentState!.validate()) {
                     final messenger = ScaffoldMessenger.of(context);
                     final nav = Navigator.of(ctx);
-                    final minStaff = int.tryParse(minStaffCtrl.text.trim()) ?? 5;
-                    final recStaff = int.tryParse(recStaffCtrl.text.trim()) ?? 7;
+                    final minStaff =
+                        int.tryParse(minStaffCtrl.text.trim()) ?? 5;
+                    final recStaff =
+                        int.tryParse(recStaffCtrl.text.trim()) ?? 7;
 
                     if (config == null) {
                       final newConfig = PeakHourConfig(
@@ -2547,11 +3057,15 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
 
                     nav.pop();
                     messenger.showSnackBar(
-                      SnackBar(content: Text(config == null ? 'Peak hour config saved' : 'Peak hour config updated')),
+                      SnackBar(
+                          content: Text(config == null
+                              ? 'Peak hour config saved'
+                              : 'Peak hour config updated')),
                     );
                   }
                 },
-                child: Text(config == null ? 'Add Peak Period' : 'Save Changes'),
+                child:
+                    Text(config == null ? 'Add Peak Period' : 'Save Changes'),
               ),
             ],
           );
@@ -2564,10 +3078,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Peak Hour', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text('Delete peak hour configuration for ${config.dayOfWeek} (${config.startTime} - ${config.endTime})?'),
+        title: const Text('Delete Peak Hour',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(
+            'Delete peak hour configuration for ${config.dayOfWeek} (${config.startTime} - ${config.endTime})?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -2580,7 +3098,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     if (confirm == true) {
       await _service.deletePeakHourConfig(config.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Peak hour configuration deleted')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Peak hour configuration deleted')));
       }
     }
   }
@@ -2589,12 +3108,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   // TAB 5: ALLOCATION RULES CRUD
   // ===========================================================================
 
+  // ignore: unused_element
   Widget _buildRulesTab() {
     return StreamBuilder<List<StaffAllocationRule>>(
       stream: _service.streamRules(widget.restaurantId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary));
         }
 
         final rules = snapshot.data ?? [];
@@ -2604,8 +3125,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
           backgroundColor: Colors.transparent,
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppTheme.primary,
-            icon: const Icon(Icons.add_rounded, color: Colors.white),
-            label: const Text('Add Rule Tier', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            icon: const Icon(Icons.add_rounded, color: AppTheme.textPrimary),
+            label: const Text('Add Rule Tier',
+                style: TextStyle(
+                    color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
             onPressed: () => _showRuleDialog(existingRules: rules),
           ),
           body: ListView(
@@ -2625,7 +3148,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     Expanded(
                       child: Text(
                         'Define demand-to-staff tiers. The recommendation system maps expected guests to these rules to calculate required staff counts.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ),
                   ],
@@ -2647,7 +3171,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     );
   }
 
-  Widget _buildRuleCard(StaffAllocationRule rule, List<StaffAllocationRule> allRules) {
+  Widget _buildRuleCard(
+      StaffAllocationRule rule, List<StaffAllocationRule> allRules) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -2664,7 +3189,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
               color: _getDemandColor(rule.demandLevel).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.group_work_rounded, color: _getDemandColor(rule.demandLevel), size: 20),
+            child: Icon(Icons.group_work_rounded,
+                color: _getDemandColor(rule.demandLevel), size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2675,13 +3201,18 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   children: [
                     Text(
                       '${rule.minCustomers} – ${rule.maxCustomers >= 900 ? '31+' : rule.maxCustomers} Guests',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppTheme.textPrimary),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _getDemandColor(rule.demandLevel).withValues(alpha: 0.12),
+                        color: _getDemandColor(rule.demandLevel)
+                            .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -2698,17 +3229,23 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                 const SizedBox(height: 2),
                 Text(
                   'Recommend: ${rule.recommendedStaff} Staff Members',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.textSecondary),
-            onPressed: () => _showRuleDialog(rule: rule, existingRules: allRules),
+            icon: const Icon(Icons.edit_outlined,
+                size: 18, color: AppTheme.textSecondary),
+            onPressed: () =>
+                _showRuleDialog(rule: rule, existingRules: allRules),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppTheme.error),
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: AppTheme.error),
             onPressed: () => _confirmDeleteRule(rule),
           ),
         ],
@@ -2722,8 +3259,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
   }) async {
     final minCtrl = TextEditingController(text: '${rule?.minCustomers ?? 0}');
     final maxCtrl = TextEditingController(text: '${rule?.maxCustomers ?? 10}');
-    final staffCtrl = TextEditingController(text: '${rule?.recommendedStaff ?? 4}');
-    final minimumStaffCtrl = TextEditingController(text: '${rule?.minimumStaff ?? 1}');
+    final staffCtrl =
+        TextEditingController(text: '${rule?.recommendedStaff ?? 4}');
+    final minimumStaffCtrl =
+        TextEditingController(text: '${rule?.minimumStaff ?? 1}');
     String demand = rule?.demandLevel ?? 'Normal';
     String status = rule?.status ?? 'Active';
     final formKey = GlobalKey<FormState>();
@@ -2733,13 +3272,22 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(rule == null ? Icons.add_circle_outline_rounded : Icons.edit_note_rounded, color: AppTheme.primary),
+                Icon(
+                    rule == null
+                        ? Icons.add_circle_outline_rounded
+                        : Icons.edit_note_rounded,
+                    color: AppTheme.primary),
                 const SizedBox(width: 8),
-                Text(rule == null ? 'Add Allocation Rule' : 'Edit Allocation Rule',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                Text(
+                    rule == null
+                        ? 'Add Allocation Rule'
+                        : 'Edit Allocation Rule',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 17)),
               ],
             ),
             content: SingleChildScrollView(
@@ -2753,7 +3301,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: minCtrl,
-                            decoration: const InputDecoration(labelText: 'Min Guests *'),
+                            decoration: const InputDecoration(
+                                labelText: 'Min Guests *'),
                             keyboardType: TextInputType.number,
                             validator: (val) {
                               final n = int.tryParse(val ?? '');
@@ -2766,7 +3315,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: maxCtrl,
-                            decoration: const InputDecoration(labelText: 'Max Guests *'),
+                            decoration: const InputDecoration(
+                                labelText: 'Max Guests *'),
                             keyboardType: TextInputType.number,
                             validator: (val) {
                               final n = int.tryParse(val ?? '');
@@ -2780,8 +3330,12 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       value: demand,
-                      decoration: const InputDecoration(labelText: 'Demand Level *'),
-                      items: _demandLevels.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      decoration:
+                          const InputDecoration(labelText: 'Demand Level *'),
+                      items: _demandLevels
+                          .map(
+                              (d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setDialogState(() => demand = val);
                       },
@@ -2792,7 +3346,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: staffCtrl,
-                            decoration: const InputDecoration(labelText: 'Recommended Staff *'),
+                            decoration: const InputDecoration(
+                                labelText: 'Recommended Staff *'),
                             keyboardType: TextInputType.number,
                             validator: (val) {
                               final n = int.tryParse(val ?? '');
@@ -2805,7 +3360,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                         Expanded(
                           child: TextFormField(
                             controller: minimumStaffCtrl,
-                            decoration: const InputDecoration(labelText: 'Minimum Staff *'),
+                            decoration: const InputDecoration(
+                                labelText: 'Minimum Staff *'),
                             keyboardType: TextInputType.number,
                             validator: (val) {
                               final n = int.tryParse(val ?? '');
@@ -2821,8 +3377,10 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                       value: status,
                       decoration: const InputDecoration(labelText: 'Status *'),
                       items: const [
-                        DropdownMenuItem(value: 'Active', child: Text('Active')),
-                        DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                        DropdownMenuItem(
+                            value: 'Active', child: Text('Active')),
+                        DropdownMenuItem(
+                            value: 'Inactive', child: Text('Inactive')),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => status = val);
@@ -2835,23 +3393,29 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                child: const Text('Cancel',
+                    style: TextStyle(color: AppTheme.textSecondary)),
               ),
               ElevatedButton(
                 onPressed: () async {
                   final minG = int.tryParse(minCtrl.text.trim()) ?? 0;
                   final maxG = int.tryParse(maxCtrl.text.trim()) ?? 10;
                   final recStaff = int.tryParse(staffCtrl.text.trim()) ?? 4;
-                  final minStaff = int.tryParse(minimumStaffCtrl.text.trim()) ?? 1;
+                  final minStaff =
+                      int.tryParse(minimumStaffCtrl.text.trim()) ?? 1;
                   if (maxG <= minG) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Max customers must be strictly greater than min customers')),
+                      const SnackBar(
+                          content: Text(
+                              'Max customers must be strictly greater than min customers')),
                     );
                     return;
                   }
                   if (minStaff > recStaff) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Recommended staff cannot be lower than minimum staff')),
+                      const SnackBar(
+                          content: Text(
+                              'Recommended staff cannot be lower than minimum staff')),
                     );
                     return;
                   }
@@ -2859,7 +3423,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                   if (formKey.currentState!.validate()) {
                     final messenger = ScaffoldMessenger.of(context);
                     final nav = Navigator.of(ctx);
-                    final existingWithoutSelf = [...existingRules.where((r) => r.id != rule?.id),
+                    final existingWithoutSelf = [
+                      ...existingRules.where((r) => r.id != rule?.id),
                       StaffAllocationRule(
                         id: 'pending',
                         restaurantId: widget.restaurantId,
@@ -2872,7 +3437,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
                       ),
                     ];
                     try {
-                      StaffAllocationService.validateRulesDoNotOverlap(existingWithoutSelf);
+                      StaffAllocationService.validateRulesDoNotOverlap(
+                          existingWithoutSelf);
                     } on ArgumentError catch (error) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(error.message)),
@@ -2906,7 +3472,9 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
 
                     nav.pop();
                     messenger.showSnackBar(
-                      SnackBar(content: Text(rule == null ? 'Rule added' : 'Rule updated')),
+                      SnackBar(
+                          content: Text(
+                              rule == null ? 'Rule added' : 'Rule updated')),
                     );
                   }
                 },
@@ -2923,10 +3491,14 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Rule', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text('Delete allocation rule for ${rule.minCustomers}-${rule.maxCustomers} guests (${rule.demandLevel})?'),
+        title: const Text('Delete Rule',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(
+            'Delete allocation rule for ${rule.minCustomers}-${rule.maxCustomers} guests (${rule.demandLevel})?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -2939,7 +3511,8 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
     if (confirm == true) {
       await _service.deleteRule(rule.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rule deleted')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Rule deleted')));
       }
     }
   }
@@ -2967,13 +3540,17 @@ class _StaffAllocationScreenState extends State<StaffAllocationScreen>
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+              style: const TextStyle(
+                  fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
             ),
           ],
         ),
