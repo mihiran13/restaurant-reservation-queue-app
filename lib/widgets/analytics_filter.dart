@@ -38,7 +38,7 @@ class AnalyticsFilter extends StatelessWidget {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
+                            color: AppTheme.surfaceHighlight,
                             blurRadius: 4,
                             offset: const Offset(0, 1),
                           )
