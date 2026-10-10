@@ -1,6 +1,7 @@
 // Lightweight data models, Firestore integration, and persistence helpers for Owner Module.
 // Covers OwnerProfile, RestaurantSettings, OperationalReport, DashboardSummary, and AnalyticsRecord.
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OwnerProfile {
   final String id;
@@ -22,11 +23,11 @@ class OwnerProfile {
   factory OwnerProfile.fromMap(Map<String, dynamic> data, String id) {
     return OwnerProfile(
       id: id,
-      name: data['name'] ?? 'Restaurant Owner',
+      name: data['name'] ?? '',
       email: data['email'] ?? '',
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      restaurantName: data['restaurantName'] ?? 'The Grand Bistro',
-      branch: data['branch'] ?? 'Main Branch',
+      restaurantId: data['restaurantId'] ?? '',
+      restaurantName: data['restaurantName'] ?? '',
+      branch: data['branch'] ?? '',
     );
   }
 
@@ -42,12 +43,12 @@ class OwnerProfile {
 }
 
 class DashboardSummary {
-  final int totalGuestsToday;
-  final String avgWaitTime;
-  final double turnoverRate;
-  final int activeTables;
-  final int totalTables;
-  final String restaurantStatus;
+  final int? totalGuestsToday;
+  final String? avgWaitTime;
+  final double? turnoverRate;
+  final int? activeTables;
+  final int? totalTables;
+  final String? restaurantStatus;
 
   const DashboardSummary({
     required this.totalGuestsToday,
@@ -59,22 +60,30 @@ class DashboardSummary {
   });
 
   static const DashboardSummary initial = DashboardSummary(
-    totalGuestsToday: 142,
-    avgWaitTime: '18 min',
-    turnoverRate: 3.4,
-    activeTables: 18,
-    totalTables: 24,
-    restaurantStatus: 'Open • Peak Service',
+    totalGuestsToday: null,
+    avgWaitTime: null,
+    turnoverRate: null,
+    activeTables: null,
+    totalTables: null,
+    restaurantStatus: null,
   );
 
   factory DashboardSummary.fromMap(Map<String, dynamic> data) {
     return DashboardSummary(
-      totalGuestsToday: data['totalGuestsToday'] ?? 142,
-      avgWaitTime: data['avgWaitTime'] ?? '18 min',
-      turnoverRate: (data['turnoverRate'] is num) ? (data['turnoverRate'] as num).toDouble() : 3.4,
-      activeTables: data['activeTables'] ?? 18,
-      totalTables: data['totalTables'] ?? 24,
-      restaurantStatus: data['restaurantStatus'] ?? 'Open • Peak Service',
+      totalGuestsToday: data['totalGuestsToday'] is num
+          ? (data['totalGuestsToday'] as num).toInt()
+          : null,
+      avgWaitTime: data['avgWaitTime']?.toString(),
+      turnoverRate: data['turnoverRate'] is num
+          ? (data['turnoverRate'] as num).toDouble()
+          : null,
+      activeTables: data['activeTables'] is num
+          ? (data['activeTables'] as num).toInt()
+          : null,
+      totalTables: data['totalTables'] is num
+          ? (data['totalTables'] as num).toInt()
+          : null,
+      restaurantStatus: data['restaurantStatus']?.toString(),
     );
   }
 
@@ -96,10 +105,11 @@ class AnalyticsRecord {
   final String id;
   final String restaurantId;
   final String date;
-  final String type; // 'peak_hours', 'turnover', 'walk_away', 'waiting_time', 'no_show'
+  final String
+      type; // 'peak_hours', 'turnover', 'walk_away', 'waiting_time', 'no_show'
   final String period; // 'Today', 'This Week', 'This Month'
   final String label;
-  final double value;
+  final double? value;
   final String? displayValue;
   final double? secondaryValue;
 
@@ -108,7 +118,7 @@ class AnalyticsRecord {
     required this.restaurantId,
     required this.date,
     required this.type,
-    this.period = 'Today',
+    required this.period,
     required this.label,
     required this.value,
     this.displayValue,
@@ -118,14 +128,19 @@ class AnalyticsRecord {
   factory AnalyticsRecord.fromMap(Map<String, dynamic> data, String id) {
     return AnalyticsRecord(
       id: id,
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      date: data['date'] ?? '',
-      type: data['type'] ?? '',
-      period: data['period'] ?? 'Today',
-      label: data['label'] ?? '',
-      value: (data['value'] is num) ? (data['value'] as num).toDouble() : 0.0,
-      displayValue: data['displayValue'],
-      secondaryValue: (data['secondaryValue'] is num) ? (data['secondaryValue'] as num).toDouble() : null,
+      restaurantId: data['restaurantId']?.toString() ?? '',
+      date: data['date']?.toString() ?? '',
+      type: data['type']?.toString() ?? '',
+      period: data['period']?.toString() ?? '',
+      label: data['label']?.toString() ?? '',
+      value: data['value'] is num && (data['value'] as num).toDouble().isFinite
+          ? (data['value'] as num).toDouble()
+          : null,
+      displayValue: data['displayValue']?.toString(),
+      secondaryValue: data['secondaryValue'] is num &&
+              (data['secondaryValue'] as num).toDouble().isFinite
+          ? (data['secondaryValue'] as num).toDouble()
+          : null,
     );
   }
 
@@ -143,17 +158,50 @@ class AnalyticsRecord {
   }
 }
 
+class AnalyticsMetrics {
+  static int? totalGuestsFromTodayPeakBuckets(
+    Iterable<AnalyticsRecord> records,
+  ) {
+    final buckets = records.where(
+      (record) => record.type == 'peak_hours' && record.period == 'Today',
+    );
+    final labels = <String>{};
+    var total = 0;
+    var foundBucket = false;
+
+    for (final bucket in buckets) {
+      final label = bucket.label.trim();
+      final value = bucket.value;
+      if (label.isEmpty ||
+          !labels.add(label) ||
+          value == null ||
+          !value.isFinite ||
+          value < 0 ||
+          value != value.truncateToDouble()) {
+        return null;
+      }
+      total += value.toInt();
+      foundBucket = true;
+    }
+
+    return foundBucket ? total : null;
+  }
+}
+
 /// Operational Report model with Firestore CRUD support.
 /// Collection: reports/{reportId}
 class OperationalReport {
   final String id;
   final String restaurantId;
   final String title;
-  final String type; // e.g. 'Daily Shift', 'Weekly Summary', 'Turnover Audit', 'Waitlist Review'
+  final String
+      type; // e.g. 'Daily Shift', 'Weekly Summary', 'Turnover Audit', 'Waitlist Review'
   final String date;
   final String summary;
   final String createdAt;
   final String? updatedAt;
+  final String dateRange;
+  final List<Map<String, dynamic>> details;
 
   const OperationalReport({
     required this.id,
@@ -164,18 +212,28 @@ class OperationalReport {
     required this.summary,
     required this.createdAt,
     this.updatedAt,
+    this.dateRange = '',
+    this.details = const [],
   });
 
   factory OperationalReport.fromMap(Map<String, dynamic> data, String id) {
     return OperationalReport(
       id: id,
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      title: data['title'] ?? 'Untitled Report',
-      type: data['type'] ?? 'Daily Shift',
-      date: data['date'] ?? '',
-      summary: data['summary'] ?? '',
-      createdAt: data['createdAt'] ?? '',
-      updatedAt: data['updatedAt'],
+      restaurantId: data['restaurantId']?.toString() ?? '',
+      title: data['title']?.toString() ?? '',
+      type: data['type']?.toString() ?? '',
+      date: data['date']?.toString() ?? '',
+      summary: data['summary']?.toString() ?? '',
+      createdAt: data['createdAt']?.toString() ?? '',
+      updatedAt: data['updatedAt']?.toString(),
+      dateRange:
+          data['dateRange']?.toString() ?? data['date']?.toString() ?? '',
+      details: data['details'] is List
+          ? (data['details'] as List)
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+          : const [],
     );
   }
 
@@ -188,6 +246,8 @@ class OperationalReport {
       'summary': summary,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'dateRange': dateRange,
+      'details': details,
     };
   }
 
@@ -197,6 +257,8 @@ class OperationalReport {
     String? date,
     String? summary,
     String? updatedAt,
+    String? dateRange,
+    List<Map<String, dynamic>>? details,
   }) {
     return OperationalReport(
       id: id,
@@ -207,6 +269,8 @@ class OperationalReport {
       summary: summary ?? this.summary,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      dateRange: dateRange ?? this.dateRange,
+      details: details ?? this.details,
     );
   }
 }
@@ -234,21 +298,25 @@ class RestaurantSettings {
     required this.autoTableAlerts,
   });
 
-  factory RestaurantSettings.fromMap(Map<String, dynamic> data, String restaurantId) {
+  factory RestaurantSettings.fromMap(
+      Map<String, dynamic> data, String restaurantId) {
     return RestaurantSettings(
       restaurantId: restaurantId,
-      restaurantName: data['restaurantName'] ?? 'The Grand Bistro',
-      branchName: data['branchName'] ?? 'Main City Branch',
-      openingTime: data['openingTime'] ?? '11:00 AM',
-      closingTime: data['closingTime'] ?? '11:00 PM',
-      maxSeatingCapacity: data['maxSeatingCapacity'] ?? 24,
-      notificationEnabled: data['notificationEnabled'] ?? true,
-      autoTableAlerts: data['autoTableAlerts'] ?? true,
+      restaurantName: data['restaurantName'] ?? '',
+      branchName: data['branchName'] ?? '',
+      openingTime: data['openingTime']?.toString() ?? '',
+      closingTime: data['closingTime']?.toString() ?? '',
+      maxSeatingCapacity: data['maxSeatingCapacity'] is num
+          ? (data['maxSeatingCapacity'] as num).toInt()
+          : 0,
+      notificationEnabled: data['notificationEnabled'] == true,
+      autoTableAlerts: data['autoTableAlerts'] == true,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'restaurantId': restaurantId,
       'restaurantName': restaurantName,
       'branchName': branchName,
       'openingTime': openingTime,
@@ -261,18 +329,17 @@ class RestaurantSettings {
 
   static const RestaurantSettings initial = RestaurantSettings(
     restaurantId: 'default_bistro_01',
-    restaurantName: 'The Grand Bistro',
-    branchName: 'Main City Branch',
-    openingTime: '11:00 AM',
-    closingTime: '11:00 PM',
-    maxSeatingCapacity: 24,
-    notificationEnabled: true,
-    autoTableAlerts: true,
+    restaurantName: '',
+    branchName: '',
+    openingTime: '',
+    closingTime: '',
+    maxSeatingCapacity: 0,
+    notificationEnabled: false,
+    autoTableAlerts: false,
   );
 }
 
-/// Helper service for fetching Firestore analytics with local fallbacks.
-/// Keeps code viva-friendly and minimal, avoiding bulky repository patterns.
+/// Helper service for Firestore analytics and owner-profile persistence.
 class FirebaseDataService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -301,21 +368,31 @@ class FirebaseDataService {
     required String email,
     String? displayName,
   }) async {
-    try {
-      final docRef = _firestore.collection('owners').doc(ownerId);
-      final docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        await docRef.set({
-          'name': displayName ?? 'Restaurant Owner',
-          'email': email,
-          'restaurantId': 'default_bistro_01',
-          'restaurantName': 'The Grand Bistro',
-          'branch': 'Main Branch',
-          'createdAt': DateTime.now().toIso8601String(),
-        });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.uid != ownerId) {
+      throw StateError('The authenticated owner does not match this profile.');
+    }
+    final token = await user.getIdTokenResult();
+    final restaurantId = token.claims?['restaurantId']?.toString();
+    if (restaurantId == null || restaurantId.isEmpty) {
+      throw StateError(
+          'This account has no restaurant access configured. Contact the Firebase administrator.');
+    }
+
+    final docRef = _firestore.collection('owners').doc(ownerId);
+    final docSnap = await docRef.get();
+    if (docSnap.exists) {
+      if (docSnap.data()?['restaurantId'] != restaurantId) {
+        throw StateError(
+            'Owner profile restaurant does not match the authenticated account.');
       }
-    } catch (e) {
-      // Graceful local handling
+    } else {
+      await docRef.set({
+        'name': displayName ?? '',
+        'email': email,
+        'restaurantId': restaurantId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     }
   }
 }

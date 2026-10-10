@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import '../../theme.dart';
 import '../../data/firebase_data.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/kpi_card.dart';
 import '../../widgets/owner_navigation.dart';
+
 import 'owner_login.dart';
 import 'peak_hours.dart';
 import 'customer_turnover.dart';
@@ -14,11 +17,17 @@ import 'waiting_time.dart';
 import 'no_show.dart';
 import 'operational_reports.dart';
 import 'settings_screen.dart';
+import 'staff_management_screen.dart';
 import 'staff_allocation_screen.dart';
 
-/// Owner Dashboard / Home Screen faithful to Assignment 2 prototype
+/// Owner Dashboard connected to Firestore analytics.
 class OwnerDashboardScreen extends StatefulWidget {
-  const OwnerDashboardScreen({super.key});
+  final String restaurantId;
+
+  const OwnerDashboardScreen({
+    super.key,
+    this.restaurantId = 'default_bistro_01',
+  });
 
   @override
   State<OwnerDashboardScreen> createState() => _OwnerDashboardScreenState();
@@ -26,24 +35,32 @@ class OwnerDashboardScreen extends StatefulWidget {
 
 class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   int _currentNavIndex = 0;
-  final DashboardSummary _summary = DashboardSummary.initial;
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Are you sure you want to sign out from the Owner Portal?'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Sign Out',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Are you sure you want to sign out from the Owner Portal?',
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.error,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Sign Out'),
@@ -54,11 +71,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
     if (confirmed == true) {
       await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const OwnerLoginScreen()),
-        );
-      }
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const OwnerLoginScreen(),
+        ),
+      );
     }
   }
 
@@ -71,564 +91,544 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
     if (index == 1) {
       _showAnalyticsMenu();
-      return;
     } else if (index == 2) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const StaffAllocationScreen()),
-      ).then((_) {
+      Navigator.of(context)
+          .push(
+        MaterialPageRoute(
+          builder: (_) =>
+              StaffManagementScreen(restaurantId: widget.restaurantId),
+        ),
+      )
+          .then((_) {
         if (mounted) setState(() => _currentNavIndex = 0);
       });
-      return;
     } else if (index == 3) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const OperationalReportsScreen()),
-      ).then((_) {
+      Navigator.of(context)
+          .push(
+        MaterialPageRoute(
+          builder: (_) =>
+              OperationalReportsScreen(restaurantId: widget.restaurantId),
+        ),
+      )
+          .then((_) {
         if (mounted) setState(() => _currentNavIndex = 0);
       });
-      return;
     } else if (index == 4) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const SettingsScreen()),
-      ).then((_) {
+      Navigator.of(context)
+          .push(
+        MaterialPageRoute(
+          builder: (_) => SettingsScreen(restaurantId: widget.restaurantId),
+        ),
+      )
+          .then((_) {
         if (mounted) setState(() => _currentNavIndex = 0);
       });
-      return;
     }
   }
 
   void _showAnalyticsMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: AppTheme.surfaceElevated,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'Owner Analytics Dashboards',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+          padding: const EdgeInsets.symmetric(
+            vertical: 20,
+            horizontal: 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'Owner Analytics Dashboards',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.schedule_rounded, color: Color(0xFF2563EB), size: 20),
+                const SizedBox(height: 12),
+                _analyticsMenuItem(
+                  ctx,
+                  Icons.schedule_rounded,
+                  'Peak Hours',
+                  'Hourly customer influx patterns',
+                  PeakHoursScreen(restaurantId: widget.restaurantId),
+                  AppTheme.accentBlue,
                 ),
-                title: const Text('Peak Hours', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Hourly customer influx patterns'),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PeakHoursScreen()));
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.loop_rounded, color: Color(0xFF059669), size: 20),
+                _analyticsMenuItem(
+                  ctx,
+                  Icons.loop_rounded,
+                  'Customer Turnover',
+                  'Table rotation and dining durations',
+                  CustomerTurnoverScreen(restaurantId: widget.restaurantId),
+                  AppTheme.accentGreen,
                 ),
-                title: const Text('Customer Turnover', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Table rotation and dining durations'),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CustomerTurnoverScreen()));
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.person_off_outlined, color: Color(0xFFEF4444), size: 20),
+                _analyticsMenuItem(
+                  ctx,
+                  Icons.person_off_outlined,
+                  'Walk-Away Metrics',
+                  'Queue drop-offs and lost parties',
+                  WalkAwayScreen(restaurantId: widget.restaurantId),
+                  AppTheme.error,
                 ),
-                title: const Text('Walk-Away Metrics', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Queue drop-offs & lost parties'),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalkAwayScreen()));
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD97706).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.timer_outlined, color: Color(0xFFD97706), size: 20),
+                _analyticsMenuItem(
+                  ctx,
+                  Icons.timer_outlined,
+                  'Average Waiting Time',
+                  'Customer check-in to seating delay',
+                  WaitingTimeScreen(restaurantId: widget.restaurantId),
+                  AppTheme.warning,
                 ),
-                title: const Text('Average Waiting Time', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Customer check-in to seating delay'),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WaitingTimeScreen()));
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.event_busy_rounded, color: Color(0xFF8B5CF6), size: 20),
+                _analyticsMenuItem(
+                  ctx,
+                  Icons.event_busy_rounded,
+                  'No-Show Rate',
+                  'Unfulfilled reservations analysis',
+                  NoShowScreen(restaurantId: widget.restaurantId),
+                  AppTheme.primary,
                 ),
-                title: const Text('No-Show Rate', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Unfulfilled reservations analysis'),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NoShowScreen()));
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                ListTile(
+                  leading: const Icon(
+                    Icons.people_alt_rounded,
+                    color: AppTheme.primary,
                   ),
-                  child: const Icon(Icons.people_alt_rounded, color: AppTheme.primary, size: 20),
+                  title: const Text(
+                    'Staff Allocation & Scheduling',
+                  ),
+                  subtitle: const Text(
+                    'Demand-based staff shift allocation',
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => StaffAllocationScreen(
+                            restaurantId: widget.restaurantId),
+                      ),
+                    );
+                  },
                 ),
-                title: const Text('Staff Allocation & Scheduling', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Demand-based staff shift allocation'),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StaffAllocationScreen()));
-                },
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     ).then((_) {
-      if (mounted) setState(() => _currentNavIndex = 0);
+      if (mounted) {
+        setState(() => _currentNavIndex = 0);
+      }
     });
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>>? _getSettingsStream() {
+  Widget _analyticsMenuItem(
+    BuildContext ctx,
+    IconData icon,
+    String title,
+    String subtitle,
+    Widget screen,
+    Color color,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {
+        Navigator.of(ctx).pop();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => screen),
+        );
+      },
+    );
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _getSettingsStream() {
+    if (Firebase.apps.isEmpty) {
+      return Stream.error(StateError('Firebase is not initialized.'));
+    }
     try {
-      return FirebaseFirestore.instance.collection('settings').doc('default_bistro_01').snapshots();
-    } catch (_) {
-      return null;
+      return FirebaseFirestore.instance
+          .collection('settings')
+          .doc(widget.restaurantId)
+          .snapshots();
+    } catch (error) {
+      return Stream.error(error);
     }
   }
 
-  User? get _currentUser {
-    try {
-      return FirebaseAuth.instance.currentUser;
-    } catch (_) {
-      return null;
+  Stream<QuerySnapshot<Map<String, dynamic>>> _getAnalyticsStream() {
+    if (Firebase.apps.isEmpty) {
+      return Stream.error(StateError('Firebase is not initialized.'));
     }
+    try {
+      return FirebaseFirestore.instance
+          .collection('analytics')
+          .where(
+            'restaurantId',
+            isEqualTo: widget.restaurantId,
+          )
+          .where('period', isEqualTo: 'Today')
+          .snapshots();
+    } catch (error) {
+      return Stream.error(error);
+    }
+  }
+
+  User? get _currentUser =>
+      Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser;
+
+  double? _averageMetric(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    String type,
+  ) {
+    final values = docs
+        .where((doc) =>
+            doc.data()['type'] == type && doc.data()['period'] == 'Today')
+        .map((doc) => doc.data()['value'])
+        .whereType<num>()
+        .map((value) => value.toDouble())
+        .where((value) => value.isFinite && value >= 0)
+        .toList();
+
+    if (values.isEmpty) return null;
+
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+
+  QueryDocumentSnapshot<Map<String, dynamic>>? _peakHourRecord(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    QueryDocumentSnapshot<Map<String, dynamic>>? peakRecord;
+    var peakValue = double.negativeInfinity;
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final value = data['value'];
+      if (data['type'] != 'peak_hours' ||
+          data['period'] != 'Today' ||
+          value is! num ||
+          !value.isFinite ||
+          value < 0) {
+        continue;
+      }
+
+      final numericValue = value.toDouble();
+      if (peakRecord == null || numericValue > peakValue) {
+        peakRecord = doc;
+        peakValue = numericValue;
+      }
+    }
+
+    return peakRecord;
+  }
+
+  String _formatMetric(double? value, {String suffix = ''}) {
+    if (value == null) return 'No data';
+
+    return '${value.toStringAsFixed(1)}$suffix';
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = _currentUser;
-    final ownerEmail = currentUser?.email ?? 'owner@restaurant.com';
+    final ownerEmail = _currentUser?.email ?? 'Owner account';
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: Column(
         children: [
-          // App Header
           AppHeader(
             title: 'Owner Dashboard',
-            subtitle: 'Overview & Service Status',
+            subtitle: 'Overview & Analytics',
             trailing: IconButton(
-              icon: const Icon(Icons.logout_rounded, color: AppTheme.textSecondary),
+              icon: const Icon(
+                Icons.logout_rounded,
+                color: AppTheme.textSecondary,
+              ),
               tooltip: 'Sign Out',
               onPressed: _handleLogout,
             ),
           ),
-
-          // Main Scrollable Dashboard Content
           Expanded(
             child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: _getSettingsStream(),
-              builder: (context, snapshot) {
-                final settingsData = snapshot.data?.data();
-                final restaurantName = settingsData?['restaurantName'] ?? 'The Grand Bistro';
-                final branchName = settingsData?['branchName'] ?? 'Main Branch';
-                final totalTables = settingsData?['maxSeatingCapacity'] ?? _summary.totalTables;
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    setState(() {});
-                  },
-                  color: AppTheme.primary,
-                  child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      // Restaurant Status Banner
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.cardBorder),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.storefront_rounded,
-                                color: AppTheme.primary,
-                                size: 26,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    restaurantName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '$branchName • $ownerEmail',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppTheme.success.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: AppTheme.success,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    'Live',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.success,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+              builder: (context, settingsSnapshot) {
+                if (settingsSnapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Unable to load restaurant settings.\n${settingsSnapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppTheme.error),
                       ),
+                    ),
+                  );
+                }
+                if (settingsSnapshot.connectionState ==
+                        ConnectionState.waiting &&
+                    !settingsSnapshot.hasData) {
+                  return const Center(
+                      child:
+                          CircularProgressIndicator(color: AppTheme.primary));
+                }
+                final settings = settingsSnapshot.data?.data() ?? {};
 
-                  const SizedBox(height: 20),
+                final restaurantName =
+                    settings['restaurantName'] ?? 'Restaurant';
 
-                  // Section Title: Key Performance Indicators
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Key Performance Indicators',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: -0.2,
+                final branchName = settings['branchName'] ?? 'Branch not set';
+
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _getAnalyticsStream(),
+                  builder: (context, analyticsSnapshot) {
+                    if (analyticsSnapshot.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Unable to load analytics data.\n'
+                            '${analyticsSnapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppTheme.error,
+                            ),
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Today',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                      );
+                    }
+
+                    if (analyticsSnapshot.connectionState ==
+                            ConnectionState.waiting &&
+                        !analyticsSnapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(
                           color: AppTheme.primary,
                         ),
-                      ),
-                    ],
-                  ),
+                      );
+                    }
 
-                  const SizedBox(height: 12),
+                    final docs = analyticsSnapshot.data?.docs ?? [];
+                    final analyticsRecords = docs
+                        .map((doc) =>
+                            AnalyticsRecord.fromMap(doc.data(), doc.id))
+                        .toList();
+                    final totalGuests =
+                        AnalyticsMetrics.totalGuestsFromTodayPeakBuckets(
+                      analyticsRecords,
+                    );
+                    final peakHour = _peakHourRecord(docs);
+                    final peakHourData = peakHour?.data();
+                    final peakHourLabel =
+                        peakHourData?['label']?.toString().trim();
+                    final peakHourValue = peakHourData?['value'];
+                    final peakHourDisplay = peakHourLabel?.isNotEmpty == true
+                        ? peakHourLabel!
+                        : 'No data';
+                    final peakHourSubtitle = peakHourData == null
+                        ? 'No peak-hour records available today'
+                        : peakHourLabel?.isNotEmpty == true
+                            ? 'Highest recorded guest flow: ${peakHourData['displayValue'] ?? peakHourValue}'
+                            : 'Peak-hour record is missing its hour label';
 
-                  // 2x2 KPI Grid matching Assignment 2 hierarchy
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.15,
-                    children: [
-                      KpiCard(
-                        title: 'Total Guests',
-                        value: '${_summary.totalGuestsToday}',
-                        subtitle: 'Walk-ins & reservations',
-                        icon: Icons.people_outline_rounded,
-                        iconColor: const Color(0xFF2563EB),
-                        trendText: '+12%',
-                        isPositiveTrend: true,
-                      ),
-                      KpiCard(
-                        title: 'Avg Waiting Time',
-                        value: _summary.avgWaitTime,
-                        subtitle: 'From check-in to table',
-                        icon: Icons.timer_outlined,
-                        iconColor: const Color(0xFFD97706),
-                        trendText: '-4 min',
-                        isPositiveTrend: true,
-                      ),
-                      KpiCard(
-                        title: 'Turnover Rate',
-                        value: '${_summary.turnoverRate}x',
-                        subtitle: 'Turns per active table',
-                        icon: Icons.loop_rounded,
-                        iconColor: const Color(0xFF059669),
-                        trendText: '+0.4',
-                        isPositiveTrend: true,
-                      ),
-                      KpiCard(
-                        title: 'Table Occupancy',
-                        value: '${_summary.activeTables}/$totalTables',
-                        subtitle: 'Capacity occupied',
-                        icon: Icons.table_restaurant_outlined,
-                        iconColor: AppTheme.primary,
-                        trendText: 'Stable',
-                        isPositiveTrend: true,
-                      ),
-                    ],
-                  ),
+                    final waitingAverage = _averageMetric(docs, 'waiting_time');
 
-                  const SizedBox(height: 22),
+                    final turnoverAverage = _averageMetric(docs, 'turnover');
 
-                  // Live Operational Status Summary Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Service Status',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        setState(() {});
+                      },
+                      color: AppTheme.primary,
+                      child: ListView(
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          _buildRestaurantBanner(
+                            restaurantName.toString(),
+                            branchName.toString(),
+                            ownerEmail,
+                          ),
+                          const SizedBox(height: 20),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Key Performance Indicators',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                ),
                               ),
-                            ),
-                            Icon(Icons.more_horiz, color: AppTheme.textMuted),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildServiceStat(
-                                'Occupied Tables',
-                                '${_summary.activeTables}',
-                                AppTheme.primary,
+                              Text(
+                                'Available analytics',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primary,
+                                ),
                               ),
-                            ),
-                            Container(width: 1, height: 36, color: AppTheme.cardBorder),
-                            Expanded(
-                              child: _buildServiceStat(
-                                'Available Tables',
-                                '${totalTables > _summary.activeTables ? totalTables - _summary.activeTables : 0}',
-                                AppTheme.success,
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          GridView.count(
+                            crossAxisCount: 2,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1.15,
+                            children: [
+                              KpiCard(
+                                title: 'Total Guests',
+                                value: totalGuests?.toString() ?? 'No data',
+                                subtitle: totalGuests == null
+                                    ? 'Requires distinct Today peak-hour guest buckets'
+                                    : 'Sum of ${analyticsRecords.where((r) => r.type == 'peak_hours' && r.period == 'Today').length} guest buckets today',
+                                icon: Icons.people_outline_rounded,
+                                iconColor: AppTheme.accentBlue,
                               ),
-                            ),
-                            Container(width: 1, height: 36, color: AppTheme.cardBorder),
-                            Expanded(
-                              child: _buildServiceStat(
-                                'Waitlist Queues',
-                                '6 groups',
-                                const Color(0xFFD97706),
+                              KpiCard(
+                                title: 'Peak Hour',
+                                value: peakHourDisplay,
+                                subtitle: peakHourSubtitle,
+                                icon: Icons.schedule_rounded,
+                                iconColor: AppTheme.primary,
                               ),
+                              KpiCard(
+                                title: 'Avg Waiting Time',
+                                value: _formatMetric(
+                                  waitingAverage,
+                                  suffix: ' min',
+                                ),
+                                subtitle: 'Mean of today\'s analytics records',
+                                icon: Icons.timer_outlined,
+                                iconColor: AppTheme.warning,
+                              ),
+                              KpiCard(
+                                title: 'Turnover Rate',
+                                value: _formatMetric(
+                                  turnoverAverage,
+                                  suffix: 'x',
+                                ),
+                                subtitle: 'Mean of today\'s analytics records',
+                                icon: Icons.loop_rounded,
+                                iconColor: AppTheme.accentGreen,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Quick Reports & Deep-Dives',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Analytical Quick Navigation Cards
-                  const Text(
-                    'Quick Reports & Deep-Dives',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildQuickAccessTile(
-                    title: 'Peak Hours & Waiting Time',
-                    subtitle: 'Hourly guest influx patterns and table queues',
-                    icon: Icons.schedule_rounded,
-                    color: const Color(0xFF2563EB),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const PeakHoursScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'Customer Turnover & Table Rotation',
-                    subtitle: 'Seat utilization efficiency and party turnover',
-                    icon: Icons.loop_rounded,
-                    color: const Color(0xFF059669),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const CustomerTurnoverScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'Walk-Away & Queue Abandonment',
-                    subtitle: 'Drop-offs and lost parties waiting in queue',
-                    icon: Icons.person_off_outlined,
-                    color: const Color(0xFFEF4444),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const WalkAwayScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'Average Waiting Time Analysis',
-                    subtitle: 'Check-in to seating delay across service shifts',
-                    icon: Icons.timer_outlined,
-                    color: const Color(0xFFD97706),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const WaitingTimeScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'No-Show Rate & Unfulfilled Bookings',
-                    subtitle: 'Unfulfilled reservations by booking source',
-                    icon: Icons.event_busy_rounded,
-                    color: const Color(0xFF8B5CF6),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const NoShowScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'Staff Allocation & Shift Scheduling',
-                    subtitle: 'Demand-based shift allocation, peak staffing & rules',
-                    icon: Icons.badge_outlined,
-                    color: AppTheme.primary,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const StaffAllocationScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'Operational Reports & Shift Audits',
-                    subtitle: 'Create, view, edit & delete management reports',
-                    icon: Icons.description_outlined,
-                    color: AppTheme.secondary,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const OperationalReportsScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  _buildQuickAccessTile(
-                    title: 'Restaurant Settings & Control Center',
-                    subtitle: 'Operating hours, capacity & queue alerts',
-                    icon: Icons.tune_rounded,
-                    color: AppTheme.primary,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-
-          // Owner Bottom Navigation Bar
+                          ),
+                          const SizedBox(height: 10),
+                          _buildQuickAccessTile(
+                            title: 'Peak Hours & Waiting Time',
+                            subtitle: 'Hourly guest influx and queue patterns',
+                            icon: Icons.schedule_rounded,
+                            color: AppTheme.accentBlue,
+                            onTap: () => _openScreen(
+                              PeakHoursScreen(
+                                  restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'Customer Turnover & Table Rotation',
+                            subtitle: 'Table rotation and seating efficiency',
+                            icon: Icons.loop_rounded,
+                            color: AppTheme.accentGreen,
+                            onTap: () => _openScreen(
+                              CustomerTurnoverScreen(
+                                  restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'Walk-Away & Queue Abandonment',
+                            subtitle: 'Queue drop-offs and lost parties',
+                            icon: Icons.person_off_outlined,
+                            color: AppTheme.error,
+                            onTap: () => _openScreen(
+                              WalkAwayScreen(restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'Average Waiting Time Analysis',
+                            subtitle: 'Check-in to seating delay',
+                            icon: Icons.timer_outlined,
+                            color: AppTheme.warning,
+                            onTap: () => _openScreen(
+                              WaitingTimeScreen(
+                                  restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'No-Show Rate',
+                            subtitle: 'Unfulfilled reservation analysis',
+                            icon: Icons.event_busy_rounded,
+                            color: AppTheme.primary,
+                            onTap: () => _openScreen(
+                              NoShowScreen(restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'Staff Allocation & Scheduling',
+                            subtitle: 'Staff shifts, allocation and rules',
+                            icon: Icons.badge_outlined,
+                            color: AppTheme.primary,
+                            onTap: () => _openScreen(
+                              StaffAllocationScreen(
+                                  restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'Operational Reports & Shift Audits',
+                            subtitle: 'Management reports and shift audits',
+                            icon: Icons.description_outlined,
+                            color: AppTheme.secondary,
+                            onTap: () => _openScreen(
+                              OperationalReportsScreen(
+                                  restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          _buildQuickAccessTile(
+                            title: 'Restaurant Settings',
+                            subtitle: 'Operating hours and restaurant capacity',
+                            icon: Icons.tune_rounded,
+                            color: AppTheme.primary,
+                            onTap: () => _openScreen(
+                              SettingsScreen(restaurantId: widget.restaurantId),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
           OwnerNavigation(
             currentIndex: _currentNavIndex,
             onItemSelected: _onNavigationChanged,
@@ -638,27 +638,67 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     );
   }
 
-  Widget _buildServiceStat(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: color,
+  Widget _buildRestaurantBanner(
+    String restaurantName,
+    String branchName,
+    String ownerEmail,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.storefront_rounded,
+              color: AppTheme.primary,
+              size: 26,
+            ),
           ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppTheme.textSecondary,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  restaurantName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$branchName • $ownerEmail',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  void _openScreen(Widget screen) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
@@ -669,52 +709,62 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.cardBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.cardBorder),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
               ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 20),
-          ],
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textMuted,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

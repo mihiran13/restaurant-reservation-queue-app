@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../theme.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/kpi_card.dart';
@@ -29,37 +30,10 @@ class _PeakHoursScreenState extends State<PeakHoursScreen> {
     });
   }
 
-  List<ChartDataPoint> _getFallbackData() {
-    if (_selectedPeriod == 'This Week') {
-      return const [
-        ChartDataPoint(label: 'Mon', value: 48, displayValue: '48'),
-        ChartDataPoint(label: 'Tue', value: 55, displayValue: '55'),
-        ChartDataPoint(label: 'Wed', value: 62, displayValue: '62'),
-        ChartDataPoint(label: 'Thu', value: 70, displayValue: '70'),
-        ChartDataPoint(label: 'Fri', value: 96, displayValue: '96'),
-        ChartDataPoint(label: 'Sat', value: 110, displayValue: '110'),
-        ChartDataPoint(label: 'Sun', value: 88, displayValue: '88'),
-      ];
-    } else if (_selectedPeriod == 'This Month') {
-      return const [
-        ChartDataPoint(label: 'W1', value: 340, displayValue: '340'),
-        ChartDataPoint(label: 'W2', value: 410, displayValue: '410'),
-        ChartDataPoint(label: 'W3', value: 460, displayValue: '460'),
-        ChartDataPoint(label: 'W4', value: 520, displayValue: '520'),
-      ];
+  Stream<QuerySnapshot<Map<String, dynamic>>> _getStream() {
+    if (Firebase.apps.isEmpty) {
+      return Stream.error(StateError('Firebase is not initialized.'));
     }
-    return const [
-      ChartDataPoint(label: '12 PM', value: 32, displayValue: '32'),
-      ChartDataPoint(label: '1 PM', value: 45, displayValue: '45'),
-      ChartDataPoint(label: '2 PM', value: 28, displayValue: '28'),
-      ChartDataPoint(label: '6 PM', value: 38, displayValue: '38'),
-      ChartDataPoint(label: '7 PM', value: 54, displayValue: '54'),
-      ChartDataPoint(label: '8 PM', value: 68, displayValue: '68'),
-      ChartDataPoint(label: '9 PM', value: 42, displayValue: '42'),
-    ];
-  }
-
-  Stream<QuerySnapshot<Map<String, dynamic>>>? _getStream() {
     try {
       return FirebaseFirestore.instance
           .collection('analytics')
@@ -67,8 +41,8 @@ class _PeakHoursScreenState extends State<PeakHoursScreen> {
           .where('type', isEqualTo: 'peak_hours')
           .where('period', isEqualTo: _selectedPeriod)
           .snapshots();
-    } catch (_) {
-      return null;
+    } catch (error) {
+      return Stream.error(error);
     }
   }
 
@@ -83,7 +57,8 @@ class _PeakHoursScreenState extends State<PeakHoursScreen> {
             subtitle: 'Hourly Customer Flow & Influx',
             showBackButton: true,
             trailing: IconButton(
-              icon: const Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary),
+              icon: const Icon(Icons.info_outline_rounded,
+                  color: AppTheme.textSecondary),
               onPressed: () {
                 showDialog(
                   context: context,
@@ -108,25 +83,32 @@ class _PeakHoursScreenState extends State<PeakHoursScreen> {
               stream: _getStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+                  return const Center(
+                      child:
+                          CircularProgressIndicator(color: AppTheme.primary));
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                      child: Text(
+                          'Unable to load peak-hour analytics: ${snapshot.error}',
+                          textAlign: TextAlign.center));
                 }
 
-                List<ChartDataPoint> chartData = [];
-                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                  chartData = snapshot.data!.docs.map((doc) {
-                    final data = doc.data();
-                    return ChartDataPoint(
-                      label: data['label'] ?? '',
-                      value: (data['value'] is num) ? (data['value'] as num).toDouble() : 0.0,
-                      displayValue: data['displayValue']?.toString(),
-                    );
-                  }).toList();
-                }
-
-                // If no custom documents in Firestore yet, show sensible fallback data
-                if (chartData.isEmpty) {
-                  chartData = _getFallbackData();
-                }
+                final chartData =
+                    normalizeChartData((snapshot.data?.docs ?? []).map((doc) {
+                  final data = doc.data();
+                  final value = data['value'];
+                  final label = data['label']?.toString().trim();
+                  return ChartDataPoint(
+                    label: label == null || label.isEmpty ? doc.id : label,
+                    value: value is num ? value.toDouble() : double.nan,
+                    displayValue: data['displayValue']?.toString(),
+                    sortKey: data['date']?.toString(),
+                  );
+                }).toList());
+                final peakPoint = chartData.isEmpty
+                    ? null
+                    : chartData.reduce((a, b) => a.value >= b.value ? a : b);
 
                 return ListView(
                   padding: const EdgeInsets.all(20),
@@ -144,22 +126,22 @@ class _PeakHoursScreenState extends State<PeakHoursScreen> {
                         Expanded(
                           child: KpiCard(
                             title: 'Peak Time Window',
-                            value: _selectedPeriod == 'Today' ? '7:30 - 8:30 PM' : 'Fri & Sat Night',
-                            subtitle: 'Busiest traffic window',
+                            value: peakPoint?.label ?? 'No data',
+                            subtitle: 'Label of the highest recorded value',
                             icon: Icons.schedule_rounded,
-                            iconColor: const Color(0xFF2563EB),
+                            iconColor: AppTheme.accentBlue,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: KpiCard(
                             title: 'Peak Volume',
-                            value: _selectedPeriod == 'Today' ? '68 Guests' : '110 Guests/hr',
-                            subtitle: '+18% above average',
+                            value: peakPoint?.displayValue ??
+                                peakPoint?.value.toStringAsFixed(0) ??
+                                'No data',
+                            subtitle: 'Highest recorded analytics value',
                             icon: Icons.groups_rounded,
                             iconColor: AppTheme.primary,
-                            trendText: '+18%',
-                            isPositiveTrend: true,
                           ),
                         ),
                       ],
@@ -174,106 +156,48 @@ class _PeakHoursScreenState extends State<PeakHoursScreen> {
                           : 'Volume trends over selected period',
                       data: chartData,
                       chartType: ChartType.bar,
-                      primaryColor: const Color(0xFF2563EB),
+                      primaryColor: AppTheme.accentBlue,
                       unit: 'Guests',
                     ),
-                      const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                      // Shift Breakdown Card
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.cardBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Shift Analysis',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            _buildShiftRow(
-                              name: 'Lunch Rush (12:00 PM – 2:30 PM)',
-                              guestCount: '105 guests',
-                              utilization: '72% table capacity',
-                              isPeak: false,
-                            ),
-                            const Divider(height: 20, color: AppTheme.cardBorder),
-                            _buildShiftRow(
-                              name: 'Dinner Rush (6:30 PM – 9:30 PM)',
-                              guestCount: '164 guests',
-                              utilization: '95% table capacity',
-                              isPeak: true,
-                            ),
-                          ],
-                        ),
+                    // Shift Breakdown Card
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.cardBorder),
                       ),
-                    ],
-                  );
-                },
-              ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Shift Analysis',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            peakPoint == null
+                                ? 'No peak-hour data available for the selected period.'
+                                : 'Peak category: ${peakPoint.label} (${peakPoint.displayValue ?? peakPoint.value.toStringAsFixed(0)}).',
+                            style:
+                                const TextStyle(color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildShiftRow({
-    required String name,
-    required String guestCount,
-    required String utilization,
-    required bool isPeak,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 38,
-          decoration: BoxDecoration(
-            color: isPeak ? AppTheme.primary : AppTheme.info,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                utilization,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          guestCount,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-      ],
     );
   }
 }
