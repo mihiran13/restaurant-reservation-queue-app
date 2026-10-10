@@ -69,9 +69,9 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
       setState(() {
         _errorMessage = _getFriendlyErrorMessage(e.code);
       });
-    } catch (_) {
+    } catch (error) {
       setState(() {
-        _errorMessage = 'An unexpected error occurred during login. Please try again.';
+        _errorMessage = 'Unable to load the owner profile: $error';
       });
     } finally {
       if (mounted) {
@@ -164,7 +164,8 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
                   // Error Message Banner
                   if (_errorMessage != null) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: AppTheme.error.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
@@ -175,7 +176,8 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 20),
+                          const Icon(Icons.error_outline_rounded,
+                              color: AppTheme.error, size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -243,10 +245,13 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
                     onFieldSubmitted: (_) => _handleLogin(),
                     decoration: InputDecoration(
                       hintText: 'Enter your password',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline_rounded, size: 20),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                           size: 20,
                         ),
                         onPressed: () {
@@ -279,7 +284,8 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
                               width: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.4,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppTheme.textPrimary),
                               ),
                             )
                           : const Row(
@@ -320,5 +326,3 @@ class _OwnerLoginScreenState extends State<OwnerLoginScreen> {
     );
   }
 }
-
-
