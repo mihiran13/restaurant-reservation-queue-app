@@ -7,10 +7,13 @@ class StaffMember {
   final String name;
   final String phone;
   final String email;
-  final String role; // Manager, Waiter, Cashier, Kitchen Staff, Host, Cleaner, Other
-  final String department; // Dining Hall, Kitchen, Front Desk, Counter, Bar, Sanitation
+  final String
+      role; // Manager, Waiter, Cashier, Kitchen Staff, Host, Cleaner, Other
+  final String
+      department; // Dining Hall, Kitchen, Front Desk, Counter, Bar, Sanitation
   final String status; // 'Active', 'Inactive'
-  final String availableHours; // e.g. '08:00 - 16:00', 'Morning Shift', 'All Day'
+  final String
+      availableHours; // e.g. '08:00 - 16:00', 'Morning Shift', 'All Day'
   final String availableFrom; // HH:mm, 24-hour time
   final String availableTo; // HH:mm, 24-hour time
   final int maxDailyHours; // e.g. 8
@@ -52,18 +55,26 @@ class StaffMember {
   factory StaffMember.fromMap(Map<String, dynamic> data, String id) {
     return StaffMember(
       id: id,
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      name: data['name'] ?? '',
-      phone: data['phone'] ?? '',
-      email: data['email'] ?? '',
-      role: data['role'] ?? 'Waiter',
-      department: data['department'] ?? 'Dining Hall',
-      status: data['status'] ?? 'Active',
-      availableHours: data['availableHours'] ?? '08:00 - 17:00',
-      availableFrom: data['availableFrom'] ?? _extractTimeFromHours(data['availableHours']) ?? '08:00',
-      availableTo: data['availableTo'] ?? _extractTimeToHours(data['availableHours']) ?? '17:00',
-      maxDailyHours: (data['maxDailyHours'] is num) ? (data['maxDailyHours'] as num).toInt() : 8,
-      createdAt: data['createdAt'] != null ? DateTime.tryParse(data['createdAt']) : null,
+      restaurantId: data['restaurantId']?.toString() ?? '',
+      name: data['name']?.toString() ?? '',
+      phone: data['phone']?.toString() ?? '',
+      email: data['email']?.toString() ?? '',
+      role: data['role']?.toString() ?? '',
+      department: data['department']?.toString() ?? '',
+      status: data['status']?.toString() ?? '',
+      availableHours: data['availableHours']?.toString() ?? '',
+      availableFrom: data['availableFrom']?.toString() ??
+          _extractTimeFromHours(data['availableHours']) ??
+          '',
+      availableTo: data['availableTo']?.toString() ??
+          _extractTimeToHours(data['availableHours']) ??
+          '',
+      maxDailyHours: (data['maxDailyHours'] is num)
+          ? (data['maxDailyHours'] as num).toInt()
+          : 0,
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'])
+          : null,
     );
   }
 
@@ -92,7 +103,8 @@ class StaffMember {
       'availableFrom': availableFrom,
       'availableTo': availableTo,
       'maxDailyHours': maxDailyHours,
-      'createdAt': createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      'createdAt':
+          createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };
   }
 
@@ -160,18 +172,20 @@ class StaffAllocation {
   factory StaffAllocation.fromMap(Map<String, dynamic> data, String id) {
     return StaffAllocation(
       id: id,
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      date: data['date'] ?? '',
-      startTime: data['startTime'] ?? '09:00',
-      endTime: data['endTime'] ?? '17:00',
-      staffId: data['staffId'] ?? '',
-      staffName: data['staffName'] ?? '',
-      staffRole: data['staffRole'] ?? 'Staff',
-      assignedArea: data['assignedArea'] ?? 'Dining Area',
-      shiftType: data['shiftType'] ?? 'Normal',
-      status: data['status'] ?? 'Scheduled',
-      notes: data['notes'] ?? '',
-      createdAt: data['createdAt'] != null ? DateTime.tryParse(data['createdAt']) : null,
+      restaurantId: data['restaurantId']?.toString() ?? '',
+      date: data['date']?.toString() ?? '',
+      startTime: data['startTime']?.toString() ?? '',
+      endTime: data['endTime']?.toString() ?? '',
+      staffId: data['staffId']?.toString() ?? '',
+      staffName: data['staffName']?.toString() ?? '',
+      staffRole: data['staffRole']?.toString() ?? '',
+      assignedArea: data['assignedArea']?.toString() ?? '',
+      shiftType: data['shiftType']?.toString() ?? '',
+      status: data['status']?.toString() ?? '',
+      notes: data['notes']?.toString() ?? '',
+      createdAt: data['createdAt'] != null
+          ? DateTime.tryParse(data['createdAt'])
+          : null,
     );
   }
 
@@ -188,7 +202,8 @@ class StaffAllocation {
       'shiftType': shiftType,
       'status': status,
       'notes': notes,
-      'createdAt': createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      'createdAt':
+          createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };
   }
 
@@ -250,14 +265,17 @@ class PeakHourConfig {
   factory PeakHourConfig.fromMap(Map<String, dynamic> data, String id) {
     return PeakHourConfig(
       id: id,
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      dayOfWeek: data['dayOfWeek'] ?? 'Monday',
-      startTime: data['startTime'] ?? '18:00',
-      endTime: data['endTime'] ?? '21:00',
-      demandLevel: data['demandLevel'] ?? 'High',
-      minStaff: (data['minStaff'] is num) ? (data['minStaff'] as num).toInt() : 5,
-      recommendedStaff: (data['recommendedStaff'] is num) ? (data['recommendedStaff'] as num).toInt() : 7,
-      status: data['status'] ?? 'Enabled',
+      restaurantId: data['restaurantId']?.toString() ?? '',
+      dayOfWeek: data['dayOfWeek']?.toString() ?? '',
+      startTime: data['startTime']?.toString() ?? '',
+      endTime: data['endTime']?.toString() ?? '',
+      demandLevel: data['demandLevel']?.toString() ?? '',
+      minStaff:
+          (data['minStaff'] is num) ? (data['minStaff'] as num).toInt() : 0,
+      recommendedStaff: (data['recommendedStaff'] is num)
+          ? (data['recommendedStaff'] as num).toInt()
+          : 0,
+      status: data['status']?.toString() ?? '',
     );
   }
 
@@ -323,13 +341,21 @@ class StaffAllocationRule {
   factory StaffAllocationRule.fromMap(Map<String, dynamic> data, String id) {
     return StaffAllocationRule(
       id: id,
-      restaurantId: data['restaurantId'] ?? 'default_bistro_01',
-      minCustomers: (data['minCustomers'] is num) ? (data['minCustomers'] as num).toInt() : 0,
-      maxCustomers: (data['maxCustomers'] is num) ? (data['maxCustomers'] as num).toInt() : 10,
-      demandLevel: data['demandLevel'] ?? 'Normal',
-      recommendedStaff: (data['recommendedStaff'] is num) ? (data['recommendedStaff'] as num).toInt() : 4,
-      minimumStaff: (data['minimumStaff'] is num) ? (data['minimumStaff'] as num).toInt() : 1,
-      status: data['status'] ?? 'Active',
+      restaurantId: data['restaurantId']?.toString() ?? '',
+      minCustomers: (data['minCustomers'] is num)
+          ? (data['minCustomers'] as num).toInt()
+          : 0,
+      maxCustomers: (data['maxCustomers'] is num)
+          ? (data['maxCustomers'] as num).toInt()
+          : 0,
+      demandLevel: data['demandLevel']?.toString() ?? '',
+      recommendedStaff: (data['recommendedStaff'] is num)
+          ? (data['recommendedStaff'] as num).toInt()
+          : 0,
+      minimumStaff: (data['minimumStaff'] is num)
+          ? (data['minimumStaff'] as num).toInt()
+          : 0,
+      status: data['status']?.toString() ?? '',
     );
   }
 
@@ -374,7 +400,8 @@ class RecommendationResult {
   final bool isPeakHour;
   final int recommendedStaff;
   final int allocatedStaff;
-  final int shortage; // positive if shortage, 0 or negative if satisfied/surplus
+  final int
+      shortage; // positive if shortage, 0 or negative if satisfied/surplus
   final PeakHourConfig? matchedPeakConfig;
   final StaffAllocationRule? matchedRule;
 
