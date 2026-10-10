@@ -19,7 +19,8 @@ import 'package:restaurant_app/data/staff_data.dart';
 import 'package:restaurant_app/services/staff_allocation_service.dart';
 
 void main() {
-  testWidgets('AppHeader renders title and subtitle properly', (WidgetTester tester) async {
+  testWidgets('AppHeader renders title and subtitle properly',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -35,7 +36,8 @@ void main() {
     expect(find.text('Overview & Service Status'), findsOneWidget);
   });
 
-  testWidgets('KpiCard renders metric values and icons', (WidgetTester tester) async {
+  testWidgets('KpiCard renders metric values and icons',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -54,7 +56,8 @@ void main() {
     expect(find.text('+12%'), findsOneWidget);
   });
 
-  testWidgets('ChartCard and AnalyticsFilter render properly', (WidgetTester tester) async {
+  testWidgets('ChartCard and AnalyticsFilter render properly',
+      (WidgetTester tester) async {
     String selected = 'Today';
     await tester.pumpWidget(
       MaterialApp(
@@ -85,63 +88,101 @@ void main() {
     expect(find.text('40'), findsOneWidget);
   });
 
-  testWidgets('OwnerLoginScreen renders without errors', (WidgetTester tester) async {
+  test(
+      'normalizeChartData filters malformed values and sorts times chronologically',
+      () {
+    final points = normalizeChartData(const [
+      ChartDataPoint(label: '8 PM', value: 8),
+      ChartDataPoint(label: '12 PM', value: 12),
+      ChartDataPoint(label: '9 AM', value: 9),
+      ChartDataPoint(label: '', value: 2),
+      ChartDataPoint(label: 'Invalid', value: double.nan),
+      ChartDataPoint(label: 'Negative', value: -1),
+    ]);
+
+    expect(points.map((point) => point.label), ['9 AM', '12 PM', '8 PM']);
+  });
+
+  testWidgets('OwnerLoginScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: OwnerLoginScreen()));
     expect(find.text('Restaurant Portal'), findsOneWidget);
     expect(find.text('Sign In as Owner'), findsOneWidget);
     expect(find.text('Email Address'), findsOneWidget);
   });
 
-  testWidgets('OwnerDashboardScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('OwnerDashboardScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: OwnerDashboardScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Owner Dashboard'), findsOneWidget);
-    expect(find.text('Key Performance Indicators'), findsOneWidget);
-    expect(find.text('Total Guests'), findsOneWidget);
+    expect(find.textContaining('Unable to load restaurant settings'),
+        findsOneWidget);
   });
 
-  testWidgets('PeakHoursScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('PeakHoursScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: PeakHoursScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Peak Hours'), findsOneWidget);
-    expect(find.text('Peak Time Window'), findsOneWidget);
+    expect(find.textContaining('Unable to load peak-hour analytics'),
+        findsOneWidget);
   });
 
-  testWidgets('CustomerTurnoverScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('CustomerTurnoverScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: CustomerTurnoverScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Customer Turnover'), findsOneWidget);
-    expect(find.text('Avg Daily Turnover'), findsOneWidget);
+    expect(find.textContaining('Unable to load turnover data'), findsOneWidget);
   });
 
-  testWidgets('WalkAwayScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('WalkAwayScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: WalkAwayScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Walk-Away Metrics'), findsOneWidget);
-    expect(find.text('Walk-Away Rate'), findsOneWidget);
+    expect(find.textContaining('Unable to load walk-away analytics'),
+        findsOneWidget);
   });
 
-  testWidgets('WaitingTimeScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('WaitingTimeScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: WaitingTimeScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Average Waiting Time'), findsOneWidget);
-    expect(find.text('Current Avg Wait'), findsOneWidget);
+    expect(find.textContaining('Unable to load waiting-time analytics'),
+        findsOneWidget);
   });
 
-  testWidgets('NoShowScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('NoShowScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: NoShowScreen()));
-    expect(find.text('No-Show Rate'), findsNWidgets(2));
-    expect(find.text('Unfulfilled Bookings'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('No-Show Rate'), findsOneWidget);
+    expect(find.textContaining('Unable to load no-show analytics'),
+        findsOneWidget);
   });
 
-  testWidgets('OperationalReportsScreen renders without errors', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: OperationalReportsScreen()));
+  testWidgets('OperationalReportsScreen renders without errors',
+      (WidgetTester tester) async {
+    await tester
+        .pumpWidget(const MaterialApp(home: OperationalReportsScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Operational Reports'), findsOneWidget);
-    expect(find.text('All'), findsOneWidget);
+    expect(find.text('Failed to load Firestore reports'), findsOneWidget);
   });
 
-  testWidgets('SettingsScreen renders without errors', (WidgetTester tester) async {
+  testWidgets('SettingsScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
     expect(find.text('Control Center'), findsOneWidget);
     expect(find.text('Restaurant Information'), findsOneWidget);
   });
 
-  testWidgets('OperationalReport and Settings data structures serialize properly', (WidgetTester tester) async {
+  testWidgets(
+      'OperationalReport and Settings data structures serialize properly',
+      (WidgetTester tester) async {
     final report = OperationalReport(
       id: 'rep_1',
       restaurantId: 'rest_1',
@@ -157,25 +198,65 @@ void main() {
 
     final settings = RestaurantSettings.initial;
     final settingsMap = settings.toMap();
-    expect(settingsMap['restaurantName'], 'The Grand Bistro');
-    expect(settingsMap['openingTime'], '11:00 AM');
+    expect(settingsMap['restaurantName'], '');
+    expect(settingsMap['openingTime'], '');
   });
 
-  testWidgets('StaffAllocationScreen renders without errors', (WidgetTester tester) async {
+  test('guest totals sum only unique Today peak-hour buckets', () {
+    final records = [
+      const AnalyticsRecord(
+        id: 'p1',
+        restaurantId: 'r1',
+        date: '2026-10-10',
+        type: 'peak_hours',
+        period: 'Today',
+        label: '12 PM',
+        value: 14,
+      ),
+      const AnalyticsRecord(
+        id: 'p2',
+        restaurantId: 'r1',
+        date: '2026-10-10',
+        type: 'peak_hours',
+        period: 'Today',
+        label: '1 PM',
+        value: 9,
+      ),
+      const AnalyticsRecord(
+        id: 'p3',
+        restaurantId: 'r1',
+        date: '2026-10-10',
+        type: 'peak_hours',
+        period: 'This Week',
+        label: 'Mon',
+        value: 80,
+      ),
+    ];
+
+    expect(AnalyticsMetrics.totalGuestsFromTodayPeakBuckets(records), 23);
+    expect(
+      AnalyticsMetrics.totalGuestsFromTodayPeakBuckets([
+        ...records,
+        records.first,
+      ]),
+      isNull,
+    );
+  });
+
+  testWidgets('StaffAllocationScreen renders without errors',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: StaffAllocationScreen()));
     expect(find.text('Staff Allocation'), findsOneWidget);
-    expect(find.text('Dashboard'), findsOneWidget);
-    expect(find.text('Staff'), findsOneWidget);
-    expect(find.text('Allocations'), findsOneWidget);
-    expect(find.text('Peak Hours'), findsOneWidget);
-    expect(find.text('Rules'), findsOneWidget);
+    expect(find.text('Assign staff to a date and time period'), findsOneWidget);
   });
 
   // =========================================================================
   // STAFF ALLOCATION & SCHEDULING TESTS
   // =========================================================================
 
-  test('StaffMember and StaffAllocation data models serialize and deserialize properly', () {
+  test(
+      'StaffMember and StaffAllocation data models serialize and deserialize properly',
+      () {
     final staff = StaffMember(
       id: 'staff_test_01',
       restaurantId: 'bistro_01',
@@ -219,7 +300,8 @@ void main() {
     expect(allocRecreated.staffName, 'Elena Rostova');
   });
 
-  test('PeakHourConfig and StaffAllocationRule data models serialize properly', () {
+  test('PeakHourConfig and StaffAllocationRule data models serialize properly',
+      () {
     final peak = PeakHourConfig(
       id: 'peak_01',
       restaurantId: 'bistro_01',
@@ -247,21 +329,43 @@ void main() {
     expect(ruleMap['recommendedStaff'], 6);
   });
 
-  test('StaffAllocationService.isTimeOverlapping accurately detects shift overlaps', () {
+  test(
+      'StaffAllocationService.isTimeOverlapping accurately detects shift overlaps',
+      () {
     // Overlapping intervals
-    expect(StaffAllocationService.isTimeOverlapping('18:00', '22:00', '19:00', '23:00'), isTrue);
-    expect(StaffAllocationService.isTimeOverlapping('10:00', '16:00', '11:00', '13:00'), isTrue);
-    expect(StaffAllocationService.isTimeOverlapping('14:00', '20:00', '12:00', '16:00'), isTrue);
+    expect(
+        StaffAllocationService.isTimeOverlapping(
+            '18:00', '22:00', '19:00', '23:00'),
+        isTrue);
+    expect(
+        StaffAllocationService.isTimeOverlapping(
+            '10:00', '16:00', '11:00', '13:00'),
+        isTrue);
+    expect(
+        StaffAllocationService.isTimeOverlapping(
+            '14:00', '20:00', '12:00', '16:00'),
+        isTrue);
 
     // Non-overlapping intervals
-    expect(StaffAllocationService.isTimeOverlapping('10:00', '14:00', '15:00', '18:00'), isFalse);
-    expect(StaffAllocationService.isTimeOverlapping('18:00', '22:00', '08:00', '12:00'), isFalse);
+    expect(
+        StaffAllocationService.isTimeOverlapping(
+            '10:00', '14:00', '15:00', '18:00'),
+        isFalse);
+    expect(
+        StaffAllocationService.isTimeOverlapping(
+            '18:00', '22:00', '08:00', '12:00'),
+        isFalse);
 
     // Contiguous (touching boundaries without overlap)
-    expect(StaffAllocationService.isTimeOverlapping('10:00', '14:00', '14:00', '18:00'), isFalse);
+    expect(
+        StaffAllocationService.isTimeOverlapping(
+            '10:00', '14:00', '14:00', '18:00'),
+        isFalse);
   });
 
-  test('StaffAllocationService.checkStaffOverlap detects conflicting shift for same staff', () {
+  test(
+      'StaffAllocationService.checkStaffOverlap detects conflicting shift for same staff',
+      () {
     final allocations = [
       const StaffAllocation(
         id: 'alloc_01',
@@ -321,7 +425,9 @@ void main() {
     expect(diffStaff, isNull);
   });
 
-  test('StaffAllocationService filters available vs inactive, booked, and unavailable staff', () {
+  test(
+      'StaffAllocationService filters available vs inactive, booked, and unavailable staff',
+      () {
     final staffList = [
       const StaffMember(
         id: 'staff_01',
@@ -394,7 +500,9 @@ void main() {
     expect(availableEvening, isEmpty);
   });
 
-  test('StaffAllocationService validates overlapping rule ranges and peak adjustment', () {
+  test(
+      'StaffAllocationService validates overlapping rule ranges and peak adjustment',
+      () {
     const rules = [
       StaffAllocationRule(
         id: 'rule_1',
@@ -454,15 +562,73 @@ void main() {
     expect(recommendation.shortage, 8);
   });
 
-  test('StaffAllocationService demand rule matching and recommendation calculation', () {
-    final rules = StaffAllocationService.defaultRules('bistro_01');
-    final peaks = StaffAllocationService.defaultPeakHours('bistro_01');
+  test(
+      'StaffAllocationService demand rule matching and recommendation calculation',
+      () {
+    const rules = [
+      StaffAllocationRule(
+          id: 'rule_01',
+          restaurantId: 'bistro_01',
+          minCustomers: 0,
+          maxCustomers: 5,
+          demandLevel: 'Low',
+          recommendedStaff: 2,
+          minimumStaff: 1),
+      StaffAllocationRule(
+          id: 'rule_02',
+          restaurantId: 'bistro_01',
+          minCustomers: 6,
+          maxCustomers: 15,
+          demandLevel: 'Normal',
+          recommendedStaff: 4,
+          minimumStaff: 2),
+      StaffAllocationRule(
+          id: 'rule_03',
+          restaurantId: 'bistro_01',
+          minCustomers: 16,
+          maxCustomers: 30,
+          demandLevel: 'High',
+          recommendedStaff: 6,
+          minimumStaff: 3),
+      StaffAllocationRule(
+          id: 'rule_04',
+          restaurantId: 'bistro_01',
+          minCustomers: 31,
+          maxCustomers: 999,
+          demandLevel: 'Very High',
+          recommendedStaff: 8,
+          minimumStaff: 4),
+    ];
+    const peaks = [
+      PeakHourConfig(
+        id: 'saturday_peak',
+        restaurantId: 'bistro_01',
+        dayOfWeek: 'Saturday',
+        startTime: '18:00',
+        endTime: '22:00',
+        demandLevel: 'Very High',
+        minStaff: 8,
+        recommendedStaff: 10,
+      ),
+    ];
 
     // Rule match verification
-    expect(StaffAllocationService.findMatchingRule(customerCount: 3, rules: rules).recommendedStaff, 2);
-    expect(StaffAllocationService.findMatchingRule(customerCount: 12, rules: rules).recommendedStaff, 4);
-    expect(StaffAllocationService.findMatchingRule(customerCount: 25, rules: rules).recommendedStaff, 6);
-    expect(StaffAllocationService.findMatchingRule(customerCount: 45, rules: rules).recommendedStaff, 8);
+    expect(
+        StaffAllocationService.findMatchingRule(customerCount: 3, rules: rules)
+            .recommendedStaff,
+        2);
+    expect(
+        StaffAllocationService.findMatchingRule(customerCount: 12, rules: rules)
+            .recommendedStaff,
+        4);
+    expect(
+        StaffAllocationService.findMatchingRule(customerCount: 25, rules: rules)
+            .recommendedStaff,
+        6);
+    expect(
+        StaffAllocationService.findMatchingRule(customerCount: 45, rules: rules)
+            .recommendedStaff,
+        8);
 
     // Scenario: Saturday 7:00 PM (19:00), 22 reservations + 5 queue = 27 customers
     // Saturday peak config has recommended 10 staff

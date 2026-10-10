@@ -1,0 +1,81 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsRestaurant(restaurantId) {
+      return signedIn()
+        && request.auth.token.restaurantId == restaurantId
+        && exists(/databases/$(database)/documents/owners/$(request.auth.uid))
+        && get(/databases/$(database)/documents/owners/$(request.auth.uid)).data.restaurantId == restaurantId;
+    }
+
+    match /owners/{ownerId} {
+      allow read: if signedIn() && request.auth.uid == ownerId;
+      allow create, update: if signedIn()
+        && request.auth.uid == ownerId
+        && request.resource.data.restaurantId == request.auth.token.restaurantId;
+      allow delete: if false;
+    }
+
+    match /settings/{restaurantId} {
+      allow read: if ownsRestaurant(restaurantId);
+      allow create, update: if ownsRestaurant(restaurantId)
+        && request.resource.data.restaurantId == restaurantId;
+      allow delete: if false;
+    }
+
+    match /staff/{staffId} {
+      allow read, delete: if ownsRestaurant(resource.data.restaurantId);
+      allow create: if ownsRestaurant(request.resource.data.restaurantId);
+      allow update: if ownsRestaurant(resource.data.restaurantId)
+        && request.resource.data.restaurantId == resource.data.restaurantId;
+    }
+
+    match /staff_allocations/{allocationId} {
+      allow read, delete: if ownsRestaurant(resource.data.restaurantId);
+      allow create: if ownsRestaurant(request.resource.data.restaurantId);
+      allow update: if ownsRestaurant(resource.data.restaurantId)
+        && request.resource.data.restaurantId == resource.data.restaurantId;
+    }
+
+    match /peak_hour_configs/{configId} {
+      allow read, delete: if ownsRestaurant(resource.data.restaurantId);
+      allow create: if ownsRestaurant(request.resource.data.restaurantId);
+      allow update: if ownsRestaurant(resource.data.restaurantId)
+        && request.resource.data.restaurantId == resource.data.restaurantId;
+    }
+
+    match /staff_allocation_rules/{ruleId} {
+      allow read, delete: if ownsRestaurant(resource.data.restaurantId);
+      allow create: if ownsRestaurant(request.resource.data.restaurantId);
+      allow update: if ownsRestaurant(resource.data.restaurantId)
+        && request.resource.data.restaurantId == resource.data.restaurantId;
+    }
+
+    match /reports/{reportId} {
+      allow read, delete: if ownsRestaurant(resource.data.restaurantId);
+      allow create: if ownsRestaurant(request.resource.data.restaurantId);
+      allow update: if ownsRestaurant(resource.data.restaurantId)
+        && request.resource.data.restaurantId == resource.data.restaurantId;
+    }
+
+    match /analytics/{recordId} {
+      allow read: if ownsRestaurant(resource.data.restaurantId);
+      allow write: if false;
+    }
+
+    match /reservations/{reservationId} {
+      allow read: if ownsRestaurant(resource.data.restaurantId);
+      allow write: if false;
+    }
+
+    match /queues/{queueId} {
+      allow read: if ownsRestaurant(resource.data.restaurantId);
+      allow write: if false;
+    }
+  }
+}
